@@ -1,4 +1,6 @@
-streamlit
+fastapi
+uvicorn
 google-genai
 PyPDF2
 python-docx
+pydantic
