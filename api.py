@@ -78,3 +78,7 @@ async def analisar_caso(req: RequisicaoCaso):
 @app.get("/")
 def home():
     return {"status": "M.A Motor Jurídico está online e operante."}
+    # 6. Rota para mostrar o site (Front-end)
+@app.get("/")
+def mostrar_site():
+    return FileResponse("index.html")
