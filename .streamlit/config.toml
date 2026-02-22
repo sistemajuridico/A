@@ -1,0 +1,19 @@
+[theme]
+# A cor principal de destaque (azul premium do seu botão)
+primaryColor="#3b82f6"
+
+# Cor de fundo principal do aplicativo (Dark Mode profundo)
+backgroundColor="#0b1120"
+
+# Cor de fundo secundária (Usada na barra lateral e fundos de inputs)
+secondaryBackgroundColor="#111827"
+
+# Cor do texto principal
+textColor="#f8fafc"
+
+# Fonte padrão (Combina com a 'Inter' que você importou no CSS)
+font="sans serif"
+
+[client]
+# Remove o menu de hambúrguer do Streamlit e o botão "Manage App"
+toolbarMode="viewer"
