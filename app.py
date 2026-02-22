@@ -9,143 +9,127 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from google import genai
 from google.genai import types
 
-# 1. CONFIGURAÇÃO DA PÁGINA E ESTILIZAÇÃO
+# 1. CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(
-    page_title="M.A | Inteligência Jurídica",
-    page_icon="⚖️",
+    page_title="M.A Inteligência Jurídica",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# CSS Customizado para DARK MODE ULTRA PREMIUM
+# CSS Customizado para MINIMALISMO PREMIUM (Preto e Branco Corporativo)
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500&display=swap');
 
-    /* Fundos e Textos Gerais */
+    /* Fundo da tela principal bem limpo */
     .stApp, [data-testid="stAppViewContainer"] { 
-        background-color: #0b1120; /* Fundo mais escuro e elegante */
+        background-color: #FAFAFA; 
         font-family: 'Inter', sans-serif;
+        color: #111111;
     }
-    [data-testid="stHeader"] { background-color: transparent; }
+    
     [data-testid="stSidebar"] { 
-        background-color: #111827 !important; 
-        border-right: 1px solid #1f2937;
+        background-color: #FFFFFF !important; 
+        border-right: 1px solid #EAEAEA;
     }
     
-    /* Tipografia de Títulos (Estilo Editorial/Jurídico) */
+    /* Tipografia Clássica Jurídica para Títulos */
     h1, h2, h3 { 
-        color: #f8fafc !important; 
-        font-family: 'Playfair Display', serif !important; 
-        font-weight: 700; 
-        letter-spacing: -0.5px;
+        color: #111111 !important; 
+        font-family: 'EB Garamond', serif !important; 
+        font-weight: 600; 
     }
-    p, label, .stMarkdown, span { color: #cbd5e1 !important; font-family: 'Inter', sans-serif; }
     
-    /* Botão Principal - Estilo LawTech Premium */
+    p, label, .stMarkdown, span { 
+        font-family: 'Inter', sans-serif; 
+        color: #333333 !important; 
+    }
+    
+    /* Botão Principal - Estilo Luxo/Minimalista */
     .stButton>button {
-        background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-        color: white !important;
-        border-radius: 6px;
-        padding: 14px 28px;
-        font-weight: 600;
-        font-size: 1.05rem;
-        letter-spacing: 0.5px;
-        border: 1px solid #3b82f6;
-        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+        background-color: #111111 !important;
+        color: #FFFFFF !important;
+        border-radius: 2px;
+        padding: 16px 24px;
+        font-weight: 500;
+        font-size: 0.85rem;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        border: 1px solid #111111;
         transition: all 0.3s ease;
         width: 100%;
     }
     .stButton>button:hover { 
-        background: linear-gradient(135deg, #2563eb, #60a5fa); 
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-        transform: translateY(-2px);
+        background-color: #333333 !important; 
+        color: #FFFFFF !important; 
     }
     
-    /* Caixa de Tese Principal (Glassmorphism sutil) */
+    /* Caixa da Tese (Escura, contrastando com o fundo branco) */
     .estilo-caixa {
-        background: rgba(30, 41, 59, 0.7);
-        backdrop-filter: blur(10px);
-        padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-left: 6px solid #60a5fa;
-        margin-bottom: 30px;
-        color: #f1f5f9;
+        background-color: #111111;
+        padding: 35px;
+        border-radius: 4px;
+        margin-bottom: 35px;
+        color: #FFFFFF;
     }
+    .estilo-caixa h3 { color: #FFFFFF !important; margin-top: 0; font-size: 1.5rem; }
+    .estilo-caixa p { color: #F0F0F0 !important; font-size: 1.1rem; line-height: 1.6; }
     
-    /* Inputs e Áreas de Texto */
+    /* Inputs minimalistas */
     .stTextArea textarea, .stTextInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #1e293b !important;
-        color: #f8fafc !important;
-        border: 1px solid #334155 !important;
-        border-radius: 8px;
-        font-size: 1rem;
-        transition: border-color 0.3s ease;
+        background-color: #FFFFFF !important;
+        color: #111111 !important;
+        border: 1px solid #CCCCCC !important;
+        border-radius: 2px;
+        box-shadow: none !important;
     }
     .stTextArea textarea:focus, .stTextInput input:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 1px #3b82f6 !important;
+        border-color: #111111 !important;
     }
     
-    /* Estilo das Abas (Tabs) Refinado */
+    /* Abas Redesenhadas (Simples e diretas) */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
         background-color: transparent;
-        border-bottom: 1px solid #334155;
-        padding-bottom: 0;
+        border-bottom: 1px solid #EAEAEA;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 45px;
-        white-space: pre-wrap;
         background-color: transparent;
-        border-radius: 6px 6px 0px 0px;
         border: none;
-        color: #94a3b8 !important;
+        color: #888888 !important;
         font-weight: 500;
-        font-family: 'Inter', sans-serif;
-        transition: color 0.2s ease;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 1px;
     }
     .stTabs [aria-selected="true"] {
-        background-color: transparent !important;
-        color: #60a5fa !important;
-        border-bottom: 3px solid #60a5fa !important;
+        color: #111111 !important;
+        border-bottom: 2px solid #111111 !important;
     }
     
-    /* Uploader de arquivo - Minimalista */
+    /* Uploader minimalista */
     [data-testid="stFileUploadDropzone"] {
-        background-color: rgba(30, 41, 59, 0.5) !important;
-        border: 2px dashed #475569 !important;
-        border-radius: 12px;
-        padding: 30px;
-        transition: all 0.3s ease;
-    }
-    [data-testid="stFileUploadDropzone"]:hover {
-        border-color: #60a5fa !important;
-        background-color: rgba(30, 41, 59, 0.8) !important;
+        background-color: #FFFFFF !important;
+        border: 1px dashed #CCCCCC !important;
+        border-radius: 2px;
     }
 
-    /* Cards de Resultados (Base Legal, Jurisp., Doutrina) */
+    /* Cards de Resultados - Estilo Papel Timbrado */
     .result-card {
-        background-color: #1e293b;
-        padding: 20px;
-        border-radius: 8px;
+        background-color: #FFFFFF;
+        padding: 25px;
         margin-bottom: 15px;
-        border: 1px solid #334155;
-        color: #e2e8f0;
+        border: 1px solid #EAEAEA;
+        border-left: 3px solid #111111;
+        color: #333333;
         font-size: 0.95rem;
-        line-height: 1.6;
+        line-height: 1.7;
     }
-    .card-legal { border-left: 4px solid #3b82f6; }
-    .card-juris { border-left: 4px solid #f59e0b; }
-    .card-doutrina { border-left: 4px solid #10b981; }
 
-    hr { border-color: #334155; }
+    hr { border-color: #EAEAEA; }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. GERENCIAMENTO DE CONFIGURAÇÕES
+# 2. CONFIGURAÇÕES
 ARQUIVO_CONFIG = "config_ma.json"
 
 def carregar_config():
@@ -168,7 +152,7 @@ def extrair_texto_pdf(arquivo_pdf):
         for pagina in leitor.pages:
             texto += pagina.extract_text() + "\n"
     except Exception as e:
-        st.error(f"Erro ao ler o PDF: {e}")
+        st.error(f"Erro na leitura do PDF: {e}")
     return texto
 
 def gerar_docx(texto_peca, dados_advogado):
@@ -179,13 +163,12 @@ def gerar_docx(texto_peca, dados_advogado):
         header.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run_nome = header.add_run(dados_advogado['advogado_nome'].upper())
         run_nome.bold = True
-        run_nome.font.size = Pt(14)
+        run_nome.font.size = Pt(12)
         
         info = doc.add_paragraph()
         info.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run_info = info.add_run(f"OAB: {dados_advogado['advogado_oab']} | {dados_advogado['advogado_endereco']}")
         run_info.font.size = Pt(9)
-        run_info.italic = True
         
         doc.add_paragraph("_" * 60).alignment = WD_ALIGN_PARAGRAPH.CENTER
         doc.add_paragraph("\n")
@@ -206,34 +189,34 @@ def gerar_docx(texto_peca, dados_advogado):
     buffer.seek(0)
     return buffer
 
-# 3. FUNÇÃO DO MOTOR DE IA
+# 3. MOTOR DA IA
 def realizar_pesquisa_processual(fatos_do_caso: str, texto_documentos: str, area_direito: str, api_key: str) -> dict:
     try:
         cliente = genai.Client(api_key=api_key)
         
         instrucoes_sistema = f"""
         Você é um advogado sênior, jurista renomado e pesquisador especialista em {area_direito} no Brasil.
-        Sua missão é atuar na ETAPA 1 de um caso: A Pesquisa e Análise Processual Estratégica.
+        Missão: ETAPA 1 - Pesquisa e Análise Processual Estratégica.
         
-        DIRETRIZES OBRIGATÓRIAS:
+        DIRETRIZES:
         1. Responda ESTRITAMENTE em Português do Brasil (PT-BR).
-        2. Utilize vernáculo jurídico adequado, formal e profissional.
-        3. Você TEM ACESSO À INTERNET através do Google Search. É OBRIGATÓRIO buscar jurisprudência real, atualizada e verídica. NÃO invente números.
+        2. Utilize vernáculo jurídico formal.
+        3. Você tem acesso à internet. Cite jurisprudência real e consolidada. Não invente dados.
         
-        Responda EXCLUSIVAMENTE em formato JSON com a seguinte estrutura exata:
+        Responda EXCLUSIVAMENTE em formato JSON com esta estrutura:
         {{
-            "resumo_estrategico": "texto do resumo claro, direto e persuasivo",
-            "base_legal": ["Artigo X da Lei Y: Explicação", "Artigo Z..."],
-            "jurisprudencia": ["Tribunal (ex: STJ) - Tema/Súmula: Explicação", "TJSP..."],
-            "doutrina": ["Nome do Autor: Resumo do entendimento", "Outro Autor..."],
-            "peca_processual": "Texto COMPLETO da peça processual com quebras de linha (\\n)."
+            "resumo_estrategico": "texto do resumo",
+            "base_legal": ["Artigo X: Explicação", "Artigo Z..."],
+            "jurisprudencia": ["Tribunal - Tema: Explicação", "TJSP..."],
+            "doutrina": ["Nome: Resumo", "Outro Autor..."],
+            "peca_processual": "Texto completo da peça com quebras de linha."
         }}
         """
 
         prompt_completo = f"{instrucoes_sistema}\n\n"
         if texto_documentos.strip():
-            prompt_completo += f"--- DOCUMENTOS DO PROCESSO ---\n{texto_documentos}\n--- FIM ---\n\n"
-        prompt_completo += f"FATOS DO CASO:\n{fatos_do_caso}"
+            prompt_completo += f"DOCUMENTOS:\n{texto_documentos}\n\n"
+        prompt_completo += f"FATOS:\n{fatos_do_caso}"
 
         resposta = cliente.models.generate_content(
             model='gemini-2.5-flash',
@@ -249,121 +232,116 @@ def realizar_pesquisa_processual(fatos_do_caso: str, texto_documentos: str, area
     except Exception as e:
         return {"erro": str(e)}
 
-# 4. INTERFACE VISUAL PRINCIPAL
-# Cabeçalho Refinado
-st.markdown("<h1 style='text-align: center; margin-bottom: 0.5rem;'>M.A <span style='color: #60a5fa;'>|</span> Inteligência Jurídica</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 1.1rem; color: #94a3b8 !important; margin-bottom: 3rem;'>Sistema avançado de apoio à decisão e pesquisa jurisprudencial</p>", unsafe_allow_html=True)
+# 4. INTERFACE VISUAL
+st.markdown("<h1 style='text-align: center; border-bottom: 1px solid #EAEAEA; padding-bottom: 20px; margin-bottom: 40px; letter-spacing: 1px;'>M.A INTELIGÊNCIA JURÍDICA</h1>", unsafe_allow_html=True)
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.markdown("<h3 style='margin-bottom: 20px;'>⚙️ Painel de Controle</h3>", unsafe_allow_html=True)
+    st.markdown("### PAINEL DE CONTROLE")
+    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
-    with st.expander("🔑 Credenciais da IA", expanded=True):
-        api_key_input = st.text_input("Chave API (Google Gemini):", value=st.session_state.config["api_key"], type="password")
+    api_key_input = st.text_input("Chave API (Google Gemini):", value=st.session_state.config["api_key"], type="password")
     
-    with st.expander("👤 Dados da Assinatura (Peça)"):
-        nome_adv = st.text_input("Nome do Advogado(a):", value=st.session_state.config["advogado_nome"])
-        oab_adv = st.text_input("OAB:", value=st.session_state.config["advogado_oab"])
-        end_adv = st.text_area("Endereço/Contato:", value=st.session_state.config["advogado_endereco"], height=100)
+    st.markdown("<br>### DADOS DA ASSINATURA", unsafe_allow_html=True)
+    nome_adv = st.text_input("Nome do Advogado(a):", value=st.session_state.config["advogado_nome"])
+    oab_adv = st.text_input("Registro OAB:", value=st.session_state.config["advogado_oab"])
+    end_adv = st.text_area("Endereço / Contato:", value=st.session_state.config["advogado_endereco"], height=100)
     
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("💾 Salvar Configurações"):
+    if st.button("SALVAR CONFIGURAÇÕES"):
         st.session_state.config = {"api_key": api_key_input, "advogado_nome": nome_adv, "advogado_oab": oab_adv, "advogado_endereco": end_adv}
         salvar_config(st.session_state.config)
-        st.success("Configurações salvas com sucesso!")
+        st.success("Salvo com sucesso.")
 
-# --- ÁREA DE INPUT (Layout em Colunas) ---
-st.markdown("### 📋 Configuração do Caso")
-st.markdown("<br>", unsafe_allow_html=True)
+# --- ENTRADA DE DADOS ---
+col1, col2 = st.columns([1, 2], gap="large")
 
-col_esq, col_dir = st.columns([1, 2], gap="large")
-
-with col_esq:
+with col1:
+    st.markdown("### PARÂMETROS DA ANÁLISE")
     area_selecionada = st.selectbox(
-        "Ramo do Direito Aplicável:",
-        ["Direito Civil, Imobiliário e Consumidor", "Direito de Família e Sucessões", "Direito Penal e Processual Penal", "Direito Previdenciário", "Direito do Trabalho", "Direito Tributário e Empresarial"]
+        "Selecione o Ramo do Direito:",
+        ["Direito Civil e Consumidor", "Direito de Família e Sucessões", "Direito Penal e Processual", "Direito Previdenciário", "Direito do Trabalho", "Direito Tributário e Empresarial"]
     )
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<p style='font-weight: 500; margin-bottom: 5px;'>📄 Autos do Processo (Opcional)</p>", unsafe_allow_html=True)
-    arquivos_anexados = st.file_uploader("Arraste PDFs iniciais, B.O. ou contratos aqui", type=["pdf"], accept_multiple_files=True, label_visibility="collapsed")
+    st.markdown("### DOCUMENTOS (OPCIONAL)")
+    arquivos_anexados = st.file_uploader("Anexar PDFs (Iniciais, Contratos, etc.)", type=["pdf"], accept_multiple_files=True, label_visibility="collapsed")
 
-with col_dir:
+with col2:
+    st.markdown("### NARRATIVA DOS FATOS")
     fatos_input = st.text_area(
-        "📝 Relato Estratégico e Instruções:", 
-        height=240, 
-        placeholder="Descreva detalhadamente os fatos do caso. Ex:\n\n'Meu cliente sofreu um golpe via Pix. O banco recebedor da fraude não bloqueou a conta mesmo após o alerta MED. Quero uma ação indenizatória focada na súmula 479 do STJ...'"
+        "", 
+        height=220, 
+        placeholder="Descreva os fatos e as instruções estratégicas de forma clara e objetiva...",
+        label_visibility="collapsed"
     )
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Botão Centralizado e Destaque
 _, col_btn, _ = st.columns([1, 2, 1])
 with col_btn:
-    executar = st.button("⚖️ Executar Análise Jurídica Avançada")
+    executar = st.button("PROCESSAR ANÁLISE ESTRATÉGICA")
 
-st.markdown("<hr style='margin-top: 3rem; margin-bottom: 3rem;'>", unsafe_allow_html=True)
+st.markdown("<hr style='margin: 40px 0;'>", unsafe_allow_html=True)
 
-# --- EXECUÇÃO E RESULTADOS ---
+# --- RESULTADOS ---
 if executar:
     if not st.session_state.config["api_key"]:
-        st.error("⚠️ Atenção: Configure sua Chave da API no painel lateral esquerdo.")
+        st.error("Insira a Chave da API no painel lateral.")
     elif len(fatos_input.strip()) < 10 and not arquivos_anexados:
-        st.warning("⚠️ Forneça um relato mínimo dos fatos ou anexe documentos para análise.")
+        st.warning("Forneça a narrativa dos fatos ou anexe documentos.")
     else:
-        with st.spinner('🔍 Analisando doutrina, consultando tribunais e estruturando tese...'):
+        with st.spinner('Acessando bases de dados e estruturando tese...'):
             texto_extraido = ""
             if arquivos_anexados:
                 for arq in arquivos_anexados:
-                    texto_extraido += f"\n--- {arq.name} ---\n{extrair_texto_pdf(arq)}"
+                    texto_extraido += f"\n{extrair_texto_pdf(arq)}"
             
             resultado = realizar_pesquisa_processual(fatos_input, texto_extraido, area_selecionada, st.session_state.config["api_key"])
             
             if "erro" in resultado:
-                st.error(f"❌ Erro na comunicação com a IA: {resultado['erro']}")
+                st.error(f"Erro no processamento: {resultado['erro']}")
             else:
-                st.markdown("## 📊 Parecer Estratégico M.A")
+                st.markdown("<h2 style='text-align: center; margin-bottom: 30px;'>PARECER TÉCNICO</h2>", unsafe_allow_html=True)
                 
-                # Tese Principal destacada
                 st.markdown(f"""
                 <div class="estilo-caixa">
-                    <h3 style='margin-top: 0; font-size: 1.4rem;'>📌 Tese Principal Formada</h3>
-                    <p style='font-size: 1.1rem; line-height: 1.7;'>{resultado.get("resumo_estrategico", "")}</p>
+                    <h3>SÍNTESE DA TESE ESTRATÉGICA</h3>
+                    <p>{resultado.get("resumo_estrategico", "")}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Sistema de Abas Redesenhado
-                tab1, tab2, tab3 = st.tabs(["⚖️ Fundamentação Legal", "🏛️ Jurisprudência Consolidada", "📚 Entendimento Doutrinário"])
+                tab1, tab2, tab3 = st.tabs(["FUNDAMENTAÇÃO LEGAL", "JURISPRUDÊNCIA", "DOUTRINA"])
                 
                 with tab1:
                     st.markdown("<br>", unsafe_allow_html=True)
                     for item in resultado.get("base_legal", []):
-                        st.markdown(f'<div class="result-card card-legal">📖 <strong>Dispositivo:</strong> {item}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="result-card"><strong>Legislação Aplicável:</strong><br>{item}</div>', unsafe_allow_html=True)
                         
                 with tab2:
                     st.markdown("<br>", unsafe_allow_html=True)
                     for item in resultado.get("jurisprudencia", []):
-                        st.markdown(f'<div class="result-card card-juris">⚖️ <strong>Precedente:</strong> {item}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="result-card"><strong>Precedente Consolidado:</strong><br>{item}</div>', unsafe_allow_html=True)
                         
                 with tab3:
                     st.markdown("<br>", unsafe_allow_html=True)
                     for item in resultado.get("doutrina", []):
-                        st.markdown(f'<div class="result-card card-doutrina">✍️ <strong>Doutrina:</strong> {item}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="result-card"><strong>Entendimento Doutrinário:</strong><br>{item}</div>', unsafe_allow_html=True)
                         
-                # Geração da Peça
                 peca_texto = resultado.get("peca_processual", "")
                 if peca_texto:
-                    st.markdown("<br><br>", unsafe_allow_html=True)
-                    st.markdown("### 📄 Minuta da Peça Processual Gerada")
-                    st.text_area("Revisão Rápida da Peça (Editável):", peca_texto, height=400)
+                    st.markdown("<hr style='margin: 40px 0;'>", unsafe_allow_html=True)
+                    st.markdown("### MINUTA DA PEÇA PROCESSUAL")
+                    st.text_area("Revisão do Documento (Editável):", peca_texto, height=450, label_visibility="collapsed")
                     
                     docx_buffer = gerar_docx(peca_texto, st.session_state.config)
                     
+                    st.markdown("<br>", unsafe_allow_html=True)
                     _, col_down, _ = st.columns([1, 2, 1])
                     with col_down:
                         st.download_button(
-                            label="⬇️ Exportar Peça em Microsoft Word (.docx)",
+                            label="EXPORTAR DOCUMENTO (.DOCX)",
                             data=docx_buffer,
-                            file_name="peca_processual_MA.docx",
+                            file_name="Peca_Processual_MA.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            type="primary"
+                            use_container_width=True
                         )
