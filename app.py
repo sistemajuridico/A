@@ -17,83 +17,84 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Customizado para DARK MODE ULTRA PREMIUM
+# CSS Customizado para LIGHT MODE CORPORATIVO PREMIUM
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@600;700&display=swap');
 
-    /* Fundos e Textos Gerais */
+    /* Fundos Gerais */
     .stApp, [data-testid="stAppViewContainer"] { 
-        background-color: #0b1120; /* Fundo mais escuro e elegante */
+        background-color: #f8fafc; /* Fundo cinza super claro (gelo), mais elegante que o branco puro */
         font-family: 'Inter', sans-serif;
     }
     [data-testid="stHeader"] { background-color: transparent; }
     [data-testid="stSidebar"] { 
-        background-color: #111827 !important; 
-        border-right: 1px solid #1f2937;
+        background-color: #ffffff !important; 
+        border-right: 1px solid #e2e8f0;
     }
     
     /* Tipografia de Títulos (Estilo Editorial/Jurídico) */
     h1, h2, h3 { 
-        color: #f8fafc !important; 
+        color: #0f172a !important; /* Azul marinho quase preto */
         font-family: 'Playfair Display', serif !important; 
         font-weight: 700; 
         letter-spacing: -0.5px;
     }
-    p, label, .stMarkdown, span { color: #cbd5e1 !important; font-family: 'Inter', sans-serif; }
+    p, label, .stMarkdown, span { color: #334155 !important; font-family: 'Inter', sans-serif; }
     
-    /* Botão Principal - Estilo LawTech Premium */
+    /* Botão Principal - Destaque vibrante */
     .stButton>button {
-        background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+        background: linear-gradient(135deg, #1e3a8a, #2563eb);
         color: white !important;
-        border-radius: 6px;
+        border-radius: 8px;
         padding: 14px 28px;
         font-weight: 600;
         font-size: 1.05rem;
         letter-spacing: 0.5px;
-        border: 1px solid #3b82f6;
-        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+        border: none;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
         transition: all 0.3s ease;
         width: 100%;
     }
     .stButton>button:hover { 
-        background: linear-gradient(135deg, #2563eb, #60a5fa); 
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        background: linear-gradient(135deg, #2563eb, #3b82f6); 
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
         transform: translateY(-2px);
     }
     
-    /* Caixa de Tese Principal (Glassmorphism sutil) */
+    /* Caixa de Tese Principal (Branca com Sombra Elegante) */
     .estilo-caixa {
-        background: rgba(30, 41, 59, 0.7);
-        backdrop-filter: blur(10px);
+        background: #ffffff;
         padding: 30px;
         border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-left: 6px solid #60a5fa;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05); /* Sombra suave para "saltar" da tela */
+        border: 1px solid #f1f5f9;
+        border-left: 6px solid #2563eb; /* Faixa azul lateral */
         margin-bottom: 30px;
-        color: #f1f5f9;
+        color: #1e293b;
     }
+    .estilo-caixa h3 { color: #1e3a8a !important; }
     
     /* Inputs e Áreas de Texto */
     .stTextArea textarea, .stTextInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #1e293b !important;
-        color: #f8fafc !important;
-        border: 1px solid #334155 !important;
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
         border-radius: 8px;
         font-size: 1rem;
-        transition: border-color 0.3s ease;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02) inset;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
     }
     .stTextArea textarea:focus, .stTextInput input:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 1px #3b82f6 !important;
+        border-color: #2563eb !important;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
     }
     
     /* Estilo das Abas (Tabs) Refinado */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
         background-color: transparent;
-        border-bottom: 1px solid #334155;
+        border-bottom: 1px solid #cbd5e1;
         padding-bottom: 0;
     }
     .stTabs [data-baseweb="tab"] {
@@ -102,46 +103,49 @@ st.markdown("""
         background-color: transparent;
         border-radius: 6px 6px 0px 0px;
         border: none;
-        color: #94a3b8 !important;
+        color: #64748b !important;
         font-weight: 500;
         font-family: 'Inter', sans-serif;
         transition: color 0.2s ease;
     }
     .stTabs [aria-selected="true"] {
         background-color: transparent !important;
-        color: #60a5fa !important;
-        border-bottom: 3px solid #60a5fa !important;
+        color: #2563eb !important;
+        border-bottom: 3px solid #2563eb !important;
     }
     
     /* Uploader de arquivo - Minimalista */
     [data-testid="stFileUploadDropzone"] {
-        background-color: rgba(30, 41, 59, 0.5) !important;
-        border: 2px dashed #475569 !important;
+        background-color: #f1f5f9 !important;
+        border: 2px dashed #94a3b8 !important;
         border-radius: 12px;
         padding: 30px;
         transition: all 0.3s ease;
     }
     [data-testid="stFileUploadDropzone"]:hover {
-        border-color: #60a5fa !important;
-        background-color: rgba(30, 41, 59, 0.8) !important;
+        border-color: #2563eb !important;
+        background-color: #e2e8f0 !important;
     }
 
-    /* Cards de Resultados (Base Legal, Jurisp., Doutrina) */
+    /* Cards de Resultados (Base Legal, Jurisp., Doutrina) - Levemente Coloridos */
     .result-card {
-        background-color: #1e293b;
         padding: 20px;
         border-radius: 8px;
         margin-bottom: 15px;
-        border: 1px solid #334155;
-        color: #e2e8f0;
-        font-size: 0.95rem;
+        border: 1px solid #e2e8f0;
+        color: #1e293b;
+        font-size: 0.98rem;
         line-height: 1.6;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.02);
     }
-    .card-legal { border-left: 4px solid #3b82f6; }
-    .card-juris { border-left: 4px solid #f59e0b; }
-    .card-doutrina { border-left: 4px solid #10b981; }
+    .card-legal { border-left: 4px solid #3b82f6; background-color: #eff6ff; } /* Azul clarinho */
+    .card-juris { border-left: 4px solid #f59e0b; background-color: #fffbeb; } /* Amarelo clarinho */
+    .card-doutrina { border-left: 4px solid #10b981; background-color: #ecfdf5; } /* Verde clarinho */
 
-    hr { border-color: #334155; }
+    hr { border-color: #e2e8f0; }
+    
+    /* Ajuste de ícones e textos secundários */
+    .st-emotion-cache-1wmy9hl { color: #64748b; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -250,13 +254,12 @@ def realizar_pesquisa_processual(fatos_do_caso: str, texto_documentos: str, area
         return {"erro": str(e)}
 
 # 4. INTERFACE VISUAL PRINCIPAL
-# Cabeçalho Refinado
-st.markdown("<h1 style='text-align: center; margin-bottom: 0.5rem;'>M.A <span style='color: #60a5fa;'>|</span> Inteligência Jurídica</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 1.1rem; color: #94a3b8 !important; margin-bottom: 3rem;'>Sistema avançado de apoio à decisão e pesquisa jurisprudencial</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; margin-bottom: 0.5rem; color: #0f172a;'>M.A <span style='color: #2563eb;'>|</span> Inteligência Jurídica</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 1.1rem; color: #64748b !important; margin-bottom: 3rem;'>Sistema avançado de apoio à decisão e pesquisa jurisprudencial</p>", unsafe_allow_html=True)
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.markdown("<h3 style='margin-bottom: 20px;'>⚙️ Painel de Controle</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='margin-bottom: 20px; color: #0f172a;'>⚙️ Painel de Controle</h3>", unsafe_allow_html=True)
     
     with st.expander("🔑 Credenciais da IA", expanded=True):
         api_key_input = st.text_input("Chave API (Google Gemini):", value=st.session_state.config["api_key"], type="password")
@@ -273,7 +276,7 @@ with st.sidebar:
         st.success("Configurações salvas com sucesso!")
 
 # --- ÁREA DE INPUT (Layout em Colunas) ---
-st.markdown("### 📋 Configuração do Caso")
+st.markdown("<h3 style='color: #0f172a;'>📋 Configuração do Caso</h3>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 
 col_esq, col_dir = st.columns([1, 2], gap="large")
@@ -284,7 +287,7 @@ with col_esq:
         ["Direito Civil, Imobiliário e Consumidor", "Direito de Família e Sucessões", "Direito Penal e Processual Penal", "Direito Previdenciário", "Direito do Trabalho", "Direito Tributário e Empresarial"]
     )
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<p style='font-weight: 500; margin-bottom: 5px;'>📄 Autos do Processo (Opcional)</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-weight: 600; margin-bottom: 5px; color: #334155;'>📄 Autos do Processo (Opcional)</p>", unsafe_allow_html=True)
     arquivos_anexados = st.file_uploader("Arraste PDFs iniciais, B.O. ou contratos aqui", type=["pdf"], accept_multiple_files=True, label_visibility="collapsed")
 
 with col_dir:
@@ -321,7 +324,7 @@ if executar:
             if "erro" in resultado:
                 st.error(f"❌ Erro na comunicação com a IA: {resultado['erro']}")
             else:
-                st.markdown("## 📊 Parecer Estratégico M.A")
+                st.markdown("<h2 style='color: #0f172a;'>📊 Parecer Estratégico M.A</h2>", unsafe_allow_html=True)
                 
                 # Tese Principal destacada
                 st.markdown(f"""
@@ -353,7 +356,7 @@ if executar:
                 peca_texto = resultado.get("peca_processual", "")
                 if peca_texto:
                     st.markdown("<br><br>", unsafe_allow_html=True)
-                    st.markdown("### 📄 Minuta da Peça Processual Gerada")
+                    st.markdown("<h3 style='color: #0f172a;'>📄 Minuta da Peça Processual Gerada</h3>", unsafe_allow_html=True)
                     st.text_area("Revisão Rápida da Peça (Editável):", peca_texto, height=400)
                     
                     docx_buffer = gerar_docx(peca_texto, st.session_state.config)
