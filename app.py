@@ -17,131 +17,31 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Customizado para DARK MODE ULTRA PREMIUM
+# CSS Reduzido: O config.toml agora cuida das cores.
+# Mantemos apenas as fontes premium e a ocultação das marcas do Streamlit.
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@600;700&display=swap');
 
-    /* Fundos e Textos Gerais */
-    .stApp, [data-testid="stAppViewContainer"] { 
-        background-color: #0b1120; /* Fundo mais escuro e elegante */
-        font-family: 'Inter', sans-serif;
-    }
-    [data-testid="stHeader"] { background-color: transparent; }
-    [data-testid="stSidebar"] { 
-        background-color: #111827 !important; 
-        border-right: 1px solid #1f2937;
-    }
-    
-    /* Tipografia de Títulos (Estilo Editorial/Jurídico) */
+    /* Tipografia (Estilo Editorial/Jurídico) */
     h1, h2, h3 { 
-        color: #f8fafc !important; 
         font-family: 'Playfair Display', serif !important; 
         font-weight: 700; 
         letter-spacing: -0.5px;
     }
-    p, label, .stMarkdown, span { color: #cbd5e1 !important; font-family: 'Inter', sans-serif; }
-    
-    /* Botão Principal - Estilo LawTech Premium */
-    .stButton>button {
-        background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-        color: white !important;
-        border-radius: 6px;
-        padding: 14px 28px;
-        font-weight: 600;
-        font-size: 1.05rem;
-        letter-spacing: 0.5px;
-        border: 1px solid #3b82f6;
-        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
-        transition: all 0.3s ease;
-        width: 100%;
-    }
-    .stButton>button:hover { 
-        background: linear-gradient(135deg, #2563eb, #60a5fa); 
-        box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-        transform: translateY(-2px);
+    p, label, .stMarkdown, span, li { 
+        font-family: 'Inter', sans-serif; 
     }
     
-    /* Caixa de Tese Principal (Glassmorphism sutil) */
-    .estilo-caixa {
-        background: rgba(30, 41, 59, 0.7);
-        backdrop-filter: blur(10px);
-        padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-left: 6px solid #60a5fa;
-        margin-bottom: 30px;
-        color: #f1f5f9;
-    }
+    /* Limpeza da Interface do Streamlit (Modo "App Próprio") */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     
-    /* Inputs e Áreas de Texto */
-    .stTextArea textarea, .stTextInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #1e293b !important;
-        color: #f8fafc !important;
-        border: 1px solid #334155 !important;
-        border-radius: 8px;
-        font-size: 1rem;
-        transition: border-color 0.3s ease;
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
     }
-    .stTextArea textarea:focus, .stTextInput input:focus {
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 1px #3b82f6 !important;
-    }
-    
-    /* Estilo das Abas (Tabs) Refinado */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: transparent;
-        border-bottom: 1px solid #334155;
-        padding-bottom: 0;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 45px;
-        white-space: pre-wrap;
-        background-color: transparent;
-        border-radius: 6px 6px 0px 0px;
-        border: none;
-        color: #94a3b8 !important;
-        font-weight: 500;
-        font-family: 'Inter', sans-serif;
-        transition: color 0.2s ease;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: transparent !important;
-        color: #60a5fa !important;
-        border-bottom: 3px solid #60a5fa !important;
-    }
-    
-    /* Uploader de arquivo - Minimalista */
-    [data-testid="stFileUploadDropzone"] {
-        background-color: rgba(30, 41, 59, 0.5) !important;
-        border: 2px dashed #475569 !important;
-        border-radius: 12px;
-        padding: 30px;
-        transition: all 0.3s ease;
-    }
-    [data-testid="stFileUploadDropzone"]:hover {
-        border-color: #60a5fa !important;
-        background-color: rgba(30, 41, 59, 0.8) !important;
-    }
-
-    /* Cards de Resultados (Base Legal, Jurisp., Doutrina) */
-    .result-card {
-        background-color: #1e293b;
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        border: 1px solid #334155;
-        color: #e2e8f0;
-        font-size: 0.95rem;
-        line-height: 1.6;
-    }
-    .card-legal { border-left: 4px solid #3b82f6; }
-    .card-juris { border-left: 4px solid #f59e0b; }
-    .card-doutrina { border-left: 4px solid #10b981; }
-
-    hr { border-color: #334155; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -250,13 +150,14 @@ def realizar_pesquisa_processual(fatos_do_caso: str, texto_documentos: str, area
         return {"erro": str(e)}
 
 # 4. INTERFACE VISUAL PRINCIPAL
-# Cabeçalho Refinado
-st.markdown("<h1 style='text-align: center; margin-bottom: 0.5rem;'>M.A <span style='color: #60a5fa;'>|</span> Inteligência Jurídica</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 1.1rem; color: #94a3b8 !important; margin-bottom: 3rem;'>Sistema avançado de apoio à decisão e pesquisa jurisprudencial</p>", unsafe_allow_html=True)
+# Cabeçalho
+st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>M.A <span style='color: #3b82f6;'>|</span> Inteligência Jurídica</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 1.1rem; opacity: 0.8; margin-bottom: 3rem;'>Sistema avançado de apoio à decisão e pesquisa jurisprudencial</p>", unsafe_allow_html=True)
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.markdown("<h3 style='margin-bottom: 20px;'>⚙️ Painel de Controle</h3>", unsafe_allow_html=True)
+    st.markdown("### ⚙️ Painel de Controle")
+    st.divider()
     
     with st.expander("🔑 Credenciais da IA", expanded=True):
         api_key_input = st.text_input("Chave API (Google Gemini):", value=st.session_state.config["api_key"], type="password")
@@ -267,41 +168,41 @@ with st.sidebar:
         end_adv = st.text_area("Endereço/Contato:", value=st.session_state.config["advogado_endereco"], height=100)
     
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("💾 Salvar Configurações"):
+    if st.button("💾 Salvar Configurações", use_container_width=True):
         st.session_state.config = {"api_key": api_key_input, "advogado_nome": nome_adv, "advogado_oab": oab_adv, "advogado_endereco": end_adv}
         salvar_config(st.session_state.config)
-        st.success("Configurações salvas com sucesso!")
+        st.success("Configurações salvas!")
 
-# --- ÁREA DE INPUT (Layout em Colunas) ---
-st.markdown("### 📋 Configuração do Caso")
-st.markdown("<br>", unsafe_allow_html=True)
-
-col_esq, col_dir = st.columns([1, 2], gap="large")
-
-with col_esq:
-    area_selecionada = st.selectbox(
-        "Ramo do Direito Aplicável:",
-        ["Direito Civil, Imobiliário e Consumidor", "Direito de Família e Sucessões", "Direito Penal e Processual Penal", "Direito Previdenciário", "Direito do Trabalho", "Direito Tributário e Empresarial"]
-    )
+# --- ÁREA DE INPUT (Dentro de um Container Estilizado) ---
+with st.container(border=True):
+    st.markdown("### 📋 Configuração do Caso")
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<p style='font-weight: 500; margin-bottom: 5px;'>📄 Autos do Processo (Opcional)</p>", unsafe_allow_html=True)
-    arquivos_anexados = st.file_uploader("Arraste PDFs iniciais, B.O. ou contratos aqui", type=["pdf"], accept_multiple_files=True, label_visibility="collapsed")
 
-with col_dir:
-    fatos_input = st.text_area(
-        "📝 Relato Estratégico e Instruções:", 
-        height=240, 
-        placeholder="Descreva detalhadamente os fatos do caso. Ex:\n\n'Meu cliente sofreu um golpe via Pix. O banco recebedor da fraude não bloqueou a conta mesmo após o alerta MED. Quero uma ação indenizatória focada na súmula 479 do STJ...'"
-    )
+    col_esq, col_dir = st.columns([1, 2], gap="large")
+
+    with col_esq:
+        area_selecionada = st.selectbox(
+            "Ramo do Direito Aplicável:",
+            ["Direito Civil, Imobiliário e Consumidor", "Direito de Família e Sucessões", "Direito Penal e Processual Penal", "Direito Previdenciário", "Direito do Trabalho", "Direito Tributário e Empresarial"]
+        )
+        st.markdown("<br>", unsafe_allow_html=True)
+        arquivos_anexados = st.file_uploader("📄 Autos do Processo (Opcional - PDFs)", type=["pdf"], accept_multiple_files=True)
+
+    with col_dir:
+        fatos_input = st.text_area(
+            "📝 Relato Estratégico e Instruções:", 
+            height=220, 
+            placeholder="Descreva detalhadamente os fatos do caso. Ex:\n\n'Meu cliente sofreu um golpe via Pix. O banco recebedor da fraude não bloqueou a conta mesmo após o alerta MED...'"
+        )
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Botão Centralizado e Destaque
+# Botão de Ação Principal (Usando o tipo 'primary' para pegar a cor azul do config.toml)
 _, col_btn, _ = st.columns([1, 2, 1])
 with col_btn:
-    executar = st.button("⚖️ Executar Análise Jurídica Avançada")
+    executar = st.button("⚖️ Executar Análise Jurídica Avançada", type="primary", use_container_width=True)
 
-st.markdown("<hr style='margin-top: 3rem; margin-bottom: 3rem;'>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
 
 # --- EXECUÇÃO E RESULTADOS ---
 if executar:
@@ -321,43 +222,44 @@ if executar:
             if "erro" in resultado:
                 st.error(f"❌ Erro na comunicação com a IA: {resultado['erro']}")
             else:
+                st.divider()
                 st.markdown("## 📊 Parecer Estratégico M.A")
                 
-                # Tese Principal destacada
-                st.markdown(f"""
-                <div class="estilo-caixa">
-                    <h3 style='margin-top: 0; font-size: 1.4rem;'>📌 Tese Principal Formada</h3>
-                    <p style='font-size: 1.1rem; line-height: 1.7;'>{resultado.get("resumo_estrategico", "")}</p>
-                </div>
-                """, unsafe_allow_html=True)
+                # Tese Principal destacada usando container nativo
+                with st.container(border=True):
+                    st.markdown("### 📌 Tese Principal Formada")
+                    st.info(resultado.get("resumo_estrategico", ""))
                 
-                # Sistema de Abas Redesenhado
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                # Sistema de Abas Nativas
                 tab1, tab2, tab3 = st.tabs(["⚖️ Fundamentação Legal", "🏛️ Jurisprudência Consolidada", "📚 Entendimento Doutrinário"])
                 
                 with tab1:
-                    st.markdown("<br>", unsafe_allow_html=True)
                     for item in resultado.get("base_legal", []):
-                        st.markdown(f'<div class="result-card card-legal">📖 <strong>Dispositivo:</strong> {item}</div>', unsafe_allow_html=True)
+                        with st.container(border=True):
+                            st.markdown(f"📖 **Dispositivo:** {item}")
                         
                 with tab2:
-                    st.markdown("<br>", unsafe_allow_html=True)
                     for item in resultado.get("jurisprudencia", []):
-                        st.markdown(f'<div class="result-card card-juris">⚖️ <strong>Precedente:</strong> {item}</div>', unsafe_allow_html=True)
+                        with st.container(border=True):
+                            st.markdown(f"⚖️ **Precedente:** {item}")
                         
                 with tab3:
-                    st.markdown("<br>", unsafe_allow_html=True)
                     for item in resultado.get("doutrina", []):
-                        st.markdown(f'<div class="result-card card-doutrina">✍️ <strong>Doutrina:</strong> {item}</div>', unsafe_allow_html=True)
+                        with st.container(border=True):
+                            st.markdown(f"✍️ **Doutrina:** {item}")
                         
                 # Geração da Peça
                 peca_texto = resultado.get("peca_processual", "")
                 if peca_texto:
-                    st.markdown("<br><br>", unsafe_allow_html=True)
+                    st.divider()
                     st.markdown("### 📄 Minuta da Peça Processual Gerada")
-                    st.text_area("Revisão Rápida da Peça (Editável):", peca_texto, height=400)
+                    st.text_area("Revisão Rápida da Peça (Editável):", peca_texto, height=400, label_visibility="collapsed")
                     
                     docx_buffer = gerar_docx(peca_texto, st.session_state.config)
                     
+                    st.markdown("<br>", unsafe_allow_html=True)
                     _, col_down, _ = st.columns([1, 2, 1])
                     with col_down:
                         st.download_button(
@@ -365,5 +267,6 @@ if executar:
                             data=docx_buffer,
                             file_name="peca_processual_MA.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            type="primary"
+                            type="primary",
+                            use_container_width=True
                         )
