@@ -249,7 +249,8 @@
             }
 
             try {
-                const resposta = await fetch('http://localhost:8000/analisar', {
+                // ATENÇÃO: Aqui mudamos de 'http://localhost:8000/analisar' para '/analisar'
+                const resposta = await fetch('/analisar', {
                     method: 'POST',
                     body: formData 
                 });
@@ -300,7 +301,8 @@
             };
 
             try {
-                const resposta = await fetch('http://localhost:8000/gerar_docx', {
+                // ATENÇÃO: Aqui mudamos de 'http://localhost:8000/gerar_docx' para '/gerar_docx'
+                const resposta = await fetch('/gerar_docx', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dados)
