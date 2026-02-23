@@ -2,7 +2,7 @@ import os
 import io
 import json
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse, FileResponse # Adicionado FileResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import PyPDF2
@@ -14,12 +14,10 @@ from google.genai import types
 
 app = FastAPI()
 
-# --- ROTA PARA SERVIR O SITE (Corrige o Erro 404) ---
 @app.get("/")
 async def serve_index():
     return FileResponse("index.html")
 
-# --- UTILITÁRIOS ---
 def extrair_texto_pdf(file_bytes):
     texto = ""
     try:
@@ -29,10 +27,9 @@ def extrair_texto_pdf(file_bytes):
             if extraido:
                 texto += extraido + "\n"
     except Exception as e:
-        print(f"Erro na extração de PDF: {e}")
+        print(f"Erro PDF: {e}")
     return texto
 
-# --- MOTOR JURÍDICO ---
 @app.post("/analisar")
 async def analisar_caso(
     api_key: str = Form(...),
@@ -41,43 +38,53 @@ async def analisar_caso(
     arquivos: List[UploadFile] = None
 ):
     try:
-        texto_documentos = ""
+        conteudos_multimais = []
+        texto_autos = ""
+
         if arquivos:
             for arquivo in arquivos:
-                conteudo = await arquivo.read()
-                if arquivo.filename.lower().endswith(".pdf"):
-                    texto_documentos += f"\n[DOCUMENTO: {arquivo.filename}]\n"
-                    texto_documentos += extrair_texto_pdf(conteudo)
+                ext = arquivo.filename.lower().split('.')[-1]
+                corpo = await arquivo.read()
+                
+                if ext == "pdf":
+                    texto_autos += f"\n[DOC: {arquivo.filename}]\n{extrair_texto_pdf(corpo)}"
+                elif ext in ["mp3", "mp4", "mpeg", "wav"]:
+                    # Envia arquivos de mídia diretamente para a multimodalidade do Gemini
+                    conteudos_multimais.append(types.Part.from_bytes(data=corpo, mime_type=arquivo.content_type))
 
         client = genai.Client(api_key=api_key)
 
         instrucoes_sistema = f"""
-        Você é o M.A JURÍDICO, nível Jus IA Experience. Especialista em {area_direito}.
+        Você é o M.A JURÍDICO ELITE. Sua especialidade é {area_direito}.
         
-        MISSÃO:
-        1. ANÁLISE DE PROVAS: Liste no campo 'checklist' 3 a 5 providências ou provas cruciais.
-        2. PESQUISA REAL: Use Google Search para acórdãos e súmulas reais.
-        3. PEÇA DE ELITE: Redija a petição completa com fundamentação robusta.
+        Sua análise deve ser MULTIDIMENSIONAL:
+        1. LINHA DO TEMPO: Extraia todas as datas e crie uma cronologia. Identifique prescrições e contradições temporais.
+        2. MODO COMBATE: Analise documentos da contraparte. Identifique furos na narrativa, falta de provas e preveja a estratégia deles.
+        3. INTELIGÊNCIA DE AUDIÊNCIA: Se houver áudio/vídeo, transcreva pontos-chave e aponte contradições entre depoimentos e autos.
+        4. VISUAL LAW: A petição deve ser moderna, com tabelas comparativas (se útil) e tópicos claros.
 
         RETORNE APENAS JSON:
         {{
-            "resumo_estrategico": "Análise técnica e probabilidade",
-            "checklist": ["Providência 1", "Prova 2", "..."],
-            "base_legal": ["Artigos"],
-            "jurisprudencia": ["Precedentes"],
-            "doutrina": ["Doutrinadores"],
-            "peca_processual": "Texto da petição"
+            "resumo_estrategico": "Análise de alto nível + chances de êxito",
+            "timeline": [{{ "data": "DD/MM/AAAA", "evento": "descrição", "alerta": "prescrição/contradição?" }}],
+            "vulnerabilidades_contraparte": ["Furo 1", "Ponto fraco 2"],
+            "checklist": ["Providência 1", "Provas a coletar"],
+            "base_legal": ["Leis/Súmulas"],
+            "jurisprudencia": ["Precedentes reais"],
+            "doutrina": ["Doutrina de peso"],
+            "peca_processual": "Petição completa com Visual Law estruturado"
         }}
         """
 
-        prompt = f"{instrucoes_sistema}\n\nDOCUMENTOS:\n{texto_documentos}\n\nCASO:\n{fatos_do_caso}"
+        prompt = [f"{instrucoes_sistema}\n\nAUTOS TEXTUAIS:\n{texto_autos}\n\nFATOS/INSTRUÇÕES:\n{fatos_do_caso}"]
+        prompt.extend(conteudos_multimais)
 
         response = client.models.generate_content(
             model='gemini-2.0-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                temperature=0.3,
+                temperature=0.2,
                 tools=[{"google_search": {}}]
             )
         )
@@ -87,7 +94,6 @@ async def analisar_caso(
     except Exception as e:
         return JSONResponse(content={"erro": str(e)}, status_code=500)
 
-# --- GERADOR DE WORD PROFISSIONAL ---
 class DadosPeca(BaseModel):
     texto_peca: str
     advogado_nome: Optional[str] = ""
@@ -118,4 +124,4 @@ async def gerar_docx(dados: DadosPeca):
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=Peca_MA_Premium.docx"})
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=Estrategia_MA_Elite.docx"})
