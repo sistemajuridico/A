@@ -39,23 +39,25 @@ async def analisar_caso(
         client = genai.Client(api_key=api_key)
         conteudos_para_ia = []
 
-        # 1. PROCESSAMENTO DE ARQUIVOS (ESTRATÉGIA DE BAIXO CONSUMO DE RAM)
+       # 1. PROCESSAMENTO DE ARQUIVOS (ULTRA EFICIENTE EM RAM)
         if arquivos:
             for arquivo in arquivos:
-                if arquivo.filename == "": continue
+                if not arquivo.filename: continue
                 
-                # Salva temporariamente no disco para não estourar a RAM do Render
                 path_temp = f"upload_{int(time.time())}_{arquivo.filename}"
-                with open(path_temp, "wb") as f:
-                    content = await arquivo.read()
-                    f.write(content)
+                
+                # EM VEZ DE .read(), usamos um buffer para salvar direto no disco
+                with open(path_temp, "wb") as buffer:
+                    while True:
+                        chunk = await arquivo.read(1024 * 1024) # Lê 1MB por vez
+                        if not chunk: break
+                        buffer.write(chunk)
+                
                 temp_files.append(path_temp)
 
-                # UPLOAD DIRETO PARA O GOOGLE (O Google lê o PDF pesado para você)
-                # Isso evita o erro de "Shutting down" por falta de memória
+                # Envia para o Google (que tem memória ilimitada para ler o arquivo)
                 file_upload = client.files.upload(path=path_temp)
                 
-                # Aguarda o processamento do arquivo (necessário para vídeos/áudios)
                 while file_upload.state.name == "PROCESSING":
                     time.sleep(2)
                     file_upload = client.files.get(name=file_upload.name)
