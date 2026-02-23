@@ -117,26 +117,21 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         }}
         """
         
-        prompt_partes = [f"FATOS:\n{fatos}"]
+        # A ABORDAGEM RAIZ (A PROVA DE BALAS): Tudo numa única lista, ficheiros primeiro!
+        prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
+        prompt_partes.append(f"{instrucoes}\n\nFATOS:\n{fatos}")
 
-        # A CORREÇÃO DE OURO: Utilizando o objeto oficial 'types.Tool'
+        # Configuração minimalista (Removidos 'response_mime_type' e 'system_instruction' que causam o erro)
         if len(conteudos_multimais) > 0:
-            config_ia = types.GenerateContentConfig(
-                temperature=0.1, 
-                response_mime_type="application/json",
-                system_instruction=instrucoes
-            )
+            config_ia = types.GenerateContentConfig(temperature=0.1)
         else:
-            pesquisa_tool = types.Tool(google_search=types.GoogleSearch())
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
-                response_mime_type="application/json",
-                system_instruction=instrucoes,
-                tools=[pesquisa_tool]
+                tools=[{"googleSearch": {}}]
             )
 
-        # O motor definitivo e correto
+        # O motor validado pela sua chave API
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
             contents=prompt_partes,
