@@ -12,4 +12,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "10000", "--timeout-keep-alive", "600", "--timeout-graceful-shutdown", "300", "--limit-concurrency", "20"]
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "10000", "--timeout-keep-alive", "600", "--timeout-graceful-shutdown", "300"]
