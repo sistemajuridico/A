@@ -3,7 +3,8 @@ import io
 import json
 import shutil
 import time
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+import uuid
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
@@ -15,14 +16,12 @@ from google.genai import types
 
 app = FastAPI()
 
-# --- ROTA DE ENTRADA ---
+# Dicionário em memória para guardar o status das análises
+TASKS = {}
 
 @app.get("/")
 def serve_index():
-    """Serve o ficheiro index.html na raiz do servidor"""
     return FileResponse("index.html")
-
-# --- UTILITÁRIOS DE TRATAMENTO ---
 
 def comprimir_video(input_path, output_path):
     try:
@@ -46,112 +45,137 @@ def comprimir_audio(input_path, output_path):
         print(f"Erro áudio: {e}")
         return False
 
-# --- MOTOR DE INTELIGÊNCIA JURÍDICA ELITE ---
-
-# BLINDAGEM ANTI-422: Todos os campos agora possuem valores padrão (default)
-@app.post("/analisar")
-def analisar_caso(
-    fatos_do_caso: str = Form(default=""),
-    area_direito: str = Form(default=""),
-    magistrado: str = Form(default=""),
-    tribunal: str = Form(default=""),
-    arquivos: Optional[List[UploadFile]] = File(default=None)
-):
-    # Validação manual para evitar o 422
-    if not fatos_do_caso or len(fatos_do_caso.strip()) < 5:
-        return JSONResponse(content={"erro": "Por favor, descreva os fatos do caso."}, status_code=400)
-
-    temp_files_to_clean = []
+# NÚCLEO ASSÍNCRONO: Processa o caso fora da conexão principal para evitar Timeout
+def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_salvos: list):
     try:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            return JSONResponse(content={"erro": "Chave API não configurada."}, status_code=500)
+            TASKS[task_id] = {"status": "error", "erro": "Chave API não configurada."}
+            return
 
         client = genai.Client(api_key=api_key)
         conteudos_multimais = []
 
-        if arquivos:
-            for arquivo in arquivos:
-                # Se o frontend enviar um campo vazio, ignoramos
-                if not arquivo.filename: 
-                    continue
-                    
-                ext = arquivo.filename.lower().split('.')[-1]
-                temp_input = f"temp_in_{int(time.time())}_{arquivo.filename}"
-                temp_files_to_clean.append(temp_input)
-                
-                # Salvamento por Streaming
-                with open(temp_input, "wb") as buffer:
-                    shutil.copyfileobj(arquivo.file, buffer)
+        for target_file, mime, original_name in arquivos_salvos:
+            gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
+            while True:
+                f_info = client.files.get(name=gemini_file.name)
+                if f_info.state.name == "FAILED":
+                    raise Exception(f"A IA falhou ao ler o arquivo {original_name}. Pode estar corrompido.")
+                if f_info.state.name != "PROCESSING": 
+                    break
+                time.sleep(3)
+            conteudos_multimais.append(f_info)
 
-                target_file = temp_input
-                mime = "application/pdf"
-                
-                if ext == "pdf":
-                    mime = "application/pdf"
-                elif ext in ["mp4", "mpeg", "mov", "avi"]:
-                    mime = "video/mp4"
-                    temp_output = f"comp_{int(time.time())}_{arquivo.filename}"
-                    if comprimir_video(temp_input, temp_output):
-                        target_file = temp_output
-                        temp_files_to_clean.append(temp_output)
-                elif ext in ["mp3", "wav", "m4a", "ogg"]:
-                    mime = "audio/mp3"
-                    temp_output = f"comp_{int(time.time())}_{arquivo.filename}"
-                    if comprimir_audio(temp_input, temp_output):
-                        target_file = temp_output
-                        temp_files_to_clean.append(temp_output)
+        # O PROMPT AGRESSIVO QUE GARANTE A PEÇA COMPLETA
+        instrucoes = f"""
+        Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
+        Use Google Search para o magistrado '{mag}' no '{trib}'.
+        
+        ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
+        Você DEVE redigir a PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
+        Inclua obrigatoriamente: 
+        1. Endereçamento correto.
+        2. Qualificação completa (use colchetes [ ] para dados faltantes).
+        3. Dos Fatos (narrativa persuasiva).
+        4. Do Direito (fundamentação profunda conectando lei, doutrina e a jurisprudência pesquisada ao caso concreto).
+        5. Dos Pedidos (específicos, claros e com requerimento de provas).
+        6. Valor da causa e fecho formal.
 
-                # Uso do parâmetro 'file=' exigido pela SDK 0.2.0
-                gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
-                
-                # O Time.sleep agora roda seguro numa thread separada pelo FastAPI
-                while True:
-                    f_info = client.files.get(name=gemini_file.name)
-                    if f_info.state.name == "FAILED":
-                        raise Exception(f"A IA falhou ao ler {arquivo.filename}. Verifique se o arquivo está corrompido.")
-                    if f_info.state.name != "PROCESSING": 
-                        break
-                    time.sleep(2)
-                conteudos_multimais.append(f_info)
-
-        instrucoes_sistema = f"""
-        Você é o M.A | JUS IA EXPERIENCE. Especialidade: {area_direito}.
-        Use Google Search para o magistrado '{magistrado}' no '{tribunal}'.
-        RETORNE ESTRITAMENTE EM JSON:
+        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
         {{
             "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
             "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
-            "base_legal": [], "jurisprudencia": [], "doutrina": [], "peca_processual": "..."
+            "base_legal": [], "jurisprudencia": [], "doutrina": [], 
+            "peca_processual": "TEXTO INTEGRAL E EXTENSO DA PEÇA AQUI..."
         }}
         """
-        prompt_partes = [f"{instrucoes_sistema}\n\nFATOS:\n{fatos_do_caso}"]
+        
+        prompt_partes = [f"{instrucoes}\n\nFATOS:\n{fatos}"]
         prompt_partes.extend(conteudos_multimais)
 
-        # Gemini 2.5 Flash para máxima estabilidade
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
             contents=prompt_partes,
             config=types.GenerateContentConfig(temperature=0.1, tools=[{"google_search": {}}])
         )
 
-        # Limpeza de Markdown
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
             texto_puro = texto_puro.replace("```json", "", 1)
         if texto_puro.endswith("```"):
             texto_puro = texto_puro.rsplit("```", 1)[0]
             
-        return JSONResponse(content=json.loads(texto_puro.strip()))
+        TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
 
     except Exception as e:
-        print(f"--- ERRO M.A ---: {str(e)}")
-        return JSONResponse(content={"erro": str(e)}, status_code=500)
+        print(f"Erro Background M.A: {str(e)}")
+        TASKS[task_id] = {"status": "error", "erro": str(e)}
     finally:
-        for f in temp_files_to_clean:
+        for f, m, o in arquivos_salvos:
             if os.path.exists(f): os.remove(f)
 
-# --- GERADOR DE WORD PROFISSIONAL ---
+@app.post("/analisar")
+def analisar_caso(
+    background_tasks: BackgroundTasks,
+    fatos_do_caso: str = Form(default=""),
+    area_direito: str = Form(default=""),
+    magistrado: str = Form(default=""),
+    tribunal: str = Form(default=""),
+    arquivos: Optional[List[UploadFile]] = File(default=[])
+):
+    if not fatos_do_caso or len(fatos_do_caso.strip()) < 5:
+        return JSONResponse(content={"erro": "Descreva os fatos."}, status_code=400)
+
+    # Gera uma ID única para esta análise
+    task_id = str(uuid.uuid4())
+    TASKS[task_id] = {"status": "processing"}
+
+    arquivos_salvos = []
+    try:
+        if arquivos:
+            for arquivo in arquivos:
+                if not arquivo.filename: continue
+                ext = arquivo.filename.lower().split('.')[-1]
+                temp_input = f"temp_in_{int(time.time())}_{arquivo.filename}"
+                
+                with open(temp_input, "wb") as buffer:
+                    shutil.copyfileobj(arquivo.file, buffer)
+                
+                target_file = temp_input
+                mime = "application/pdf"
+                if ext == "pdf": 
+                    mime = "application/pdf"
+                elif ext in ["mp4", "mpeg", "mov", "avi"]:
+                    mime = "video/mp4"
+                    temp_output = f"comp_{int(time.time())}_{arquivo.filename}"
+                    if comprimir_video(temp_input, temp_output):
+                        os.remove(temp_input)
+                        target_file = temp_output
+                elif ext in ["mp3", "wav", "m4a", "ogg"]:
+                    mime = "audio/mp3"
+                    temp_output = f"comp_{int(time.time())}_{arquivo.filename}"
+                    if comprimir_audio(temp_input, temp_output):
+                        os.remove(temp_input)
+                        target_file = temp_output
+                        
+                arquivos_salvos.append((target_file, mime, arquivo.filename))
+                
+    except Exception as e:
+        return JSONResponse(content={"erro": f"Erro ao salvar arquivo: {str(e)}"}, status_code=500)
+
+    # Envia para processamento em 2º plano e libera a conexão pro site não travar
+    background_tasks.add_task(processar_background, task_id, fatos_do_caso, area_direito, magistrado, tribunal, arquivos_salvos)
+    
+    return JSONResponse(content={"task_id": task_id})
+
+# ROTA NOVA: O site fica batendo aqui para saber se a IA já terminou
+@app.get("/status/{task_id}")
+def check_status(task_id: str):
+    task = TASKS.get(task_id)
+    if not task:
+        return JSONResponse(content={"status": "error", "erro": "Tarefa perdida ou expirada."})
+    return JSONResponse(content=task)
 
 class DadosPeca(BaseModel):
     texto_peca: str
