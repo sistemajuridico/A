@@ -172,19 +172,23 @@
         }
 
         async function processar() {
+            const fatos = document.getElementById('fatosCaso').value;
+            if (!fatos || fatos.trim().length < 5) {
+                alert("Por favor, descreva os fatos do caso antes de analisar.");
+                return;
+            }
+
             const btn = document.getElementById('btnExecutar');
             const loader = document.getElementById('loader');
             const results = document.getElementById('results');
 
-            // Reset de interface
             loader.classList.remove('hidden');
             results.classList.add('hidden');
             btn.disabled = true;
 
             const fd = new FormData();
-            // Mapeamento exato para os campos da api.py
-            fd.append("fatos_do_caso", document.getElementById('fatosCaso').value);
-            fd.append("area_direito", document.getElementById('areaDireito').value);
+            fd.append("fatos_do_caso", fatos);
+            fd.append("area_direito", document.getElementById('areaDireito').value || "");
             fd.append("magistrado", document.getElementById('magistrado').value || "");
             fd.append("tribunal", document.getElementById('tribunal').value || "");
             
@@ -196,12 +200,11 @@
                 
                 if (!res.ok) {
                     const errorData = await res.json();
-                    throw new Error(errorData.erro || errorData.detail || "Erro desconhecido no servidor.");
+                    throw new Error(errorData.erro || errorData.detail || "Erro de validação ou servidor.");
                 }
 
                 const d = await res.json();
 
-                // Preenchimento de dados
                 document.getElementById('jurimetria').innerText = d.jurimetria || "Análise indisponível.";
                 document.getElementById('resumo_cliente').innerText = d.resumo_cliente || "";
                 document.getElementById('peca').value = d.peca_processual || "";
@@ -235,7 +238,7 @@
                 loader.classList.add('hidden');
                 results.classList.remove('hidden');
             } catch (e) { 
-                alert("Erro: " + e.message); 
+                alert("Erro ao analisar: " + e.message); 
                 loader.classList.add('hidden'); 
             } finally {
                 btn.disabled = false;
