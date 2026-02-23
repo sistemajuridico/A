@@ -3,6 +3,7 @@ import io
 import json
 import shutil
 import time
+import asyncio
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -18,6 +19,8 @@ app = FastAPI()
 @app.get("/")
 async def serve_index():
     return FileResponse("index.html")
+
+# --- UTILITÁRIOS DE COMPRESSÃO (Importação Local para Economia de RAM) ---
 
 def comprimir_video(input_path, output_path):
     try:
@@ -41,6 +44,8 @@ def comprimir_audio(input_path, output_path):
         print(f"Erro áudio: {e}")
         return False
 
+# --- NÚCLEO DE ANÁLISE JURÍDICA ---
+
 @app.post("/analisar")
 async def analisar_caso(
     fatos_do_caso: str = Form(...),
@@ -62,9 +67,10 @@ async def analisar_caso(
             for arquivo in arquivos:
                 if not arquivo.filename: continue
                 ext = arquivo.filename.lower().split('.')[-1]
-                temp_input = f"temp_in_{int(time.time())}_{arquivo.filename}"
+                temp_input = f"strm_{int(time.time())}_{arquivo.filename}"
                 temp_files_to_clean.append(temp_input)
                 
+                # Cópia em disco para evitar estouro de RAM
                 with open(temp_input, "wb") as buffer:
                     shutil.copyfileobj(arquivo.file, buffer)
 
@@ -86,14 +92,19 @@ async def analisar_caso(
                         target_file = temp_output
                         temp_files_to_clean.append(temp_output)
 
+                # Upload para nuvem do Google (OCR automático)
                 gemini_file = client.files.upload(path=target_file, config={'mime_type': mime})
+                
+                # LOOP ASSÍNCRONO: Mantém o servidor vivo no Render
                 while True:
                     f_info = client.files.get(name=gemini_file.name)
-                    if f_info.state.name != "PROCESSING": break
-                    time.sleep(2)
+                    if f_info.state.name != "PROCESSING":
+                        break
+                    await asyncio.sleep(2) # Não trava o worker do servidor
+                
                 conteudos_multimais.append(f_info)
 
-        instrucoes_sistema = f"""
+        instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE. Especialidade: {area_direito}.
         Use Google Search para o magistrado '{magistrado}' no '{tribunal}'.
         RETORNE ESTRITAMENTE EM JSON:
@@ -103,17 +114,19 @@ async def analisar_caso(
             "base_legal": [], "jurisprudencia": [], "doutrina": [], "peca_processual": "..."
         }}
         """
-        prompt_partes = [f"{instrucoes_sistema}\n\nFATOS:\n{fatos_do_caso}"]
-        prompt_partes.extend(conteudos_multimais)
+        prompt_final = [f"{instrucoes}\n\nFATOS: {fatos_do_caso}"]
+        prompt_final.extend(conteudos_multimais)
 
+        # Motor Estável de 2026
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
-            contents=prompt_partes,
+            contents=prompt_final,
             config=types.GenerateContentConfig(temperature=0.1, tools=[{"google_search": {}}])
         )
 
-        texto_puro = response.text.strip().replace("```json", "").replace("```", "").strip()
-        return JSONResponse(content=json.loads(texto_puro))
+        # Limpeza do JSON contra erros de coluna 1
+        texto_limpo = response.text.strip().replace("```json", "").replace("```", "").strip()
+        return JSONResponse(content=json.loads(texto_limpo))
 
     except Exception as e:
         print(f"--- ERRO M.A ---: {str(e)}")
@@ -121,6 +134,8 @@ async def analisar_caso(
     finally:
         for f in temp_files_to_clean:
             if os.path.exists(f): os.remove(f)
+
+# --- GERADOR DE WORD ---
 
 class DadosPeca(BaseModel):
     texto_peca: str
@@ -135,27 +150,21 @@ async def gerar_docx(dados: DadosPeca):
         for s in doc.sections:
             s.top_margin, s.bottom_margin, s.left_margin, s.right_margin = Cm(3), Cm(2), Cm(3), Cm(2)
 
-        # Proteção contra dados vazios ou nulos
         if dados.advogado_nome:
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            nome = str(dados.advogado_nome).upper()
-            oab = str(dados.advogado_oab) if dados.advogado_oab else "---"
-            end = str(dados.advogado_endereco) if dados.advogado_endereco else ""
-            run_h = p.add_run(f"{nome}\nOAB: {oab}\n{end}")
+            run_h = p.add_run(f"{str(dados.advogado_nome).upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}")
             run_h.font.size, run_h.font.name, run_h.italic = Pt(10), 'Times New Roman', True
 
         for linha in dados.texto_peca.split('\n'):
             if linha.strip():
                 para = doc.add_paragraph(linha.strip())
-                para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                para.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+                para.alignment, para.paragraph_format.line_spacing_rule = WD_ALIGN_PARAGRAPH.JUSTIFY, WD_LINE_SPACING.ONE_POINT_FIVE
                 para.paragraph_format.first_line_indent = Cm(2.0)
 
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
-        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
+        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Estrategia.docx"})
     except Exception as e:
-        print(f"Erro ao gerar DOCX: {e}")
         return JSONResponse(content={"erro": str(e)}, status_code=500)
