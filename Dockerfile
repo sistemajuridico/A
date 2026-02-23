@@ -12,4 +12,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "api:app", "--bind", "0.0.0.0:10000", "--timeout", "600"]
+# Comando otimizado para economia de RAM e estabilidade em 2026
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "10000", "--timeout-keep-alive", "600"]
