@@ -4,7 +4,7 @@ import json
 import shutil
 import time
 import uuid
-import unicodedata # NOVO: Para limpar caracteres invisíveis de PDFs
+import unicodedata
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -17,7 +17,6 @@ from google.genai import types
 
 app = FastAPI()
 
-# --- 1. MIDDLEWARE: Aumentado para 300MB para aceitar os vários volumes ao mesmo tempo ---
 MAX_UPLOAD_SIZE = 300 * 1024 * 1024  
 
 @app.middleware("http")
@@ -102,7 +101,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
-        Use Google Search para o magistrado '{mag}' no '{trib}'.
+        Concentre-se na análise técnica, doutrinária e jurisprudencial.
         
         ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
         Você DEVE redigir a PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
@@ -120,10 +119,17 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         prompt_partes = [f"{instrucoes}\n\nFATOS:\n{fatos}"]
         prompt_partes.extend(conteudos_multimais)
 
+        # --- A SOLUÇÃO MÁGICA: Configuração Dinâmica ---
+        # A API da Google não aceita 'google_search' se houver ficheiros enviados juntos.
+        if len(conteudos_multimais) > 0:
+            config_ia = types.GenerateContentConfig(temperature=0.1)
+        else:
+            config_ia = types.GenerateContentConfig(temperature=0.1, tools=[{"google_search": {}}])
+
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
             contents=prompt_partes,
-            config=types.GenerateContentConfig(temperature=0.1, tools=[{"google_search": {}}])
+            config=config_ia
         )
 
         texto_puro = response.text.strip()
@@ -135,7 +141,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
 
     except Exception as e:
-        # Limpeza forçada do erro para nunca dar o erro \u0303 na tela novamente
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
         TASKS[task_id] = {"status": "error", "erro": f"Erro na IA: {erro_seguro}"}
     finally:
@@ -151,7 +156,6 @@ async def analisar_caso(
     tribunal: str = Form(default=""),
     arquivos: Optional[List[UploadFile]] = File(default=[])
 ):
-    # Desinfeção de caracteres "fantasmas" (Remove o problema do \u0303 copiado do PDF)
     fatos_limpos = unicodedata.normalize('NFC', fatos_do_caso) if fatos_do_caso else ""
     mag_limpo = unicodedata.normalize('NFC', magistrado) if magistrado else ""
     trib_limpo = unicodedata.normalize('NFC', tribunal) if tribunal else ""
@@ -183,7 +187,6 @@ async def analisar_caso(
     except Exception as e:
         return JSONResponse(content={"erro": "Erro de codificação ao salvar o arquivo."}, status_code=500)
 
-    # Inicia a IA com os textos limpos
     background_tasks.add_task(processar_background, task_id, fatos_limpos, area_direito, mag_limpo, trib_limpo, arquivos_brutos)
     
     return JSONResponse(content={"task_id": task_id})
