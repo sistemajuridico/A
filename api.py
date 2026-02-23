@@ -124,7 +124,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         prompt_partes.extend(conteudos_multimais)
         prompt_partes.append(f"{instrucoes}\n\nFATOS:\n{fatos}")
 
-        # --- A VACINA DOS FILTROS (Permite analisar crimes, litígios e afins sem a Google bloquear) ---
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
             types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
@@ -135,12 +134,14 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if len(conteudos_multimais) > 0:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1,
+                max_output_tokens=8192, # O pulmão máximo da IA para evitar cortes
                 response_mime_type="application/json",
                 safety_settings=filtros_seguranca
             )
         else:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
+                max_output_tokens=8192,
                 response_mime_type="application/json",
                 tools=[{"googleSearch": {}}],
                 safety_settings=filtros_seguranca
@@ -152,11 +153,10 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             config=config_ia
         )
 
-        # --- A REDE DE PROTEÇÃO CONTRA O NONETYPE ---
         if getattr(response, 'text', None) is None:
             motivo = "A Google bloqueou a resposta silenciosamente."
             if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
-                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial da Google: {response.candidates[0].finish_reason}"
+                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial: {response.candidates[0].finish_reason}"
             raise Exception(motivo)
 
         texto_puro = response.text.strip()
@@ -165,7 +165,25 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if texto_puro.endswith("```"):
             texto_puro = texto_puro.rsplit("```", 1)[0]
             
-        TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
+        # --- A REDE DE SEGURANÇA (PLANO B) ---
+        try:
+            resultado_final = json.loads(texto_puro.strip())
+        except Exception as erro_json:
+            # Se a IA escorregar nas aspas, nós apanhamos o texto à força!
+            resultado_final = {
+                "resumo_estrategico": "A IA gerou um texto tão colossal que quebrou a formatação dos painéis, mas a peça processual foi recuperada com sucesso! Veja abaixo.",
+                "jurimetria": "Formatação corrompida.",
+                "resumo_cliente": "Formatação corrompida.",
+                "timeline": [{"data": "HOJE", "evento": "Análise Bruta Concluída"}],
+                "vulnerabilidades_contraparte": ["Recuperação de texto bruto ativada."],
+                "checklist": [],
+                "base_legal": [],
+                "jurisprudencia": [],
+                "doutrina": [],
+                "peca_processual": texto_puro.strip() # O texto gigante entra aqui intacto!
+            }
+            
+        TASKS[task_id] = {"status": "done", "resultado": resultado_final}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
