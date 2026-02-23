@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M.A | Inteligência Jurídica Premium</title>
+    <title>M.A | Legal Intelligence Elite</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script>
@@ -13,144 +13,104 @@
             theme: {
                 extend: {
                     fontFamily: { sans: ['Inter', 'sans-serif'], serif: ['Playfair Display', 'serif'] },
-                    colors: { deep: '#050505', panel: '#0f1115', bordercolor: '#1f2937', brand: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' } }
+                    colors: { deep: '#020617', panel: '#0f172a', bordercolor: '#1e293b', brand: { 500: '#3b82f6' } }
                 }
             }
         }
     </script>
     <style>
-        body { background-color: #050505; color: #e2e8f0; overflow-x: hidden; }
-        .glass-card { background: rgba(15, 17, 21, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .input-dark { background-color: rgba(0, 0, 0, 0.2); border: 1px solid #1f2937; color: #f8fafc; outline: none; }
-        .input-dark:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
-        .btn-glow { background: linear-gradient(135deg, #1e3a8a, #3b82f6); transition: all 0.3s ease; }
-        .btn-glow:hover { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); transform: translateY(-1px); }
-        .ai-pulse { width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(from 0deg, #3b82f6, #8b5cf6, transparent); animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; position: relative; }
-        .ai-pulse::after { content: ""; width: 32px; height: 32px; background: #0f1115; border-radius: 50%; position: absolute; }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-        .tab-active { border-bottom: 2px solid #3b82f6; color: white; }
-        .check-item { transition: all 0.2s; }
-        .check-item:hover { background: rgba(59, 130, 246, 0.1); }
-        
-        @media (max-width: 768px) {
-            #sidebar { width: 100%; max-width: 300px; }
-        }
+        body { background-color: #020617; color: #f1f5f9; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .btn-premium { background: linear-gradient(135deg, #1d4ed8, #3b82f6); box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        .timeline-item::before { content: ''; position: absolute; left: -17px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; border: 2px solid #020617; }
+        .ai-glow { animation: pulse-glow 2s infinite ease-in-out; }
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.2); } 50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); } }
     </style>
 </head>
 <body class="flex h-screen antialiased">
 
-    <aside id="sidebar" class="hidden md:flex flex-col w-80 border-r border-bordercolor bg-panel h-full z-50 fixed md:relative shadow-2xl transition-all duration-300">
+    <aside id="sidebar" class="hidden md:flex flex-col w-80 border-r border-bordercolor bg-panel h-full z-50 fixed md:relative transition-all">
         <div class="p-8 border-b border-bordercolor text-center flex justify-between items-center md:block">
-            <div>
-                <h1 class="font-serif text-3xl font-bold tracking-tight text-white mb-1">M.A</h1>
-                <p class="text-[0.65rem] font-bold uppercase tracking-widest text-slate-500 font-sans">Estratégia Jurídica</p>
-            </div>
-            <button onclick="toggleMenu()" class="md:hidden text-slate-500 text-2xl p-2"><i class="fa-solid fa-xmark"></i></button>
+            <h1 class="font-serif text-3xl font-bold text-white">M.A</h1>
+            <button onclick="toggleMenu()" class="md:hidden text-slate-500 text-2xl"><i class="fa-solid fa-xmark"></i></button>
         </div>
-
-        <div class="p-6 flex-1 overflow-y-auto space-y-8">
+        <div class="p-6 space-y-6 overflow-y-auto">
             <div>
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Google Gemini Key</label>
-                <input type="password" id="apiKey" class="input-dark w-full p-3 rounded-lg text-sm mb-3" placeholder="Insira sua chave...">
-                
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-4">Área de Atuação</label>
-                <select id="areaDireito" class="input-dark w-full p-3 rounded-lg text-sm">
-                    <option value="Direito Civil, Imobiliário e Consumidor">Civil, Imobiliário e Consumidor</option>
-                    <option value="Direito de Família e Sucessões">Família e Sucessões</option>
-                    <option value="Direito Penal e Processual Penal">Penal e Processual Penal</option>
-                    <option value="Direito Previdenciário">Previdenciário</option>
-                    <option value="Direito do Trabalho">Trabalho</option>
-                    <option value="Direito Tributário e Empresarial">Tributário e Empresarial</option>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Credenciais</label>
+                <input type="password" id="apiKey" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white outline-none focus:border-brand-500" placeholder="Gemini API Key">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Especialidade</label>
+                <select id="areaDireito" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white">
+                    <option>Direito Civil e Consumidor</option>
+                    <option>Direito de Família</option>
+                    <option>Direito Penal</option>
+                    <option>Direito do Trabalho</option>
                 </select>
             </div>
-
-            <div class="pt-4 border-t border-bordercolor">
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 font-sans">Assinatura Profissional</label>
-                <input type="text" id="advNome" class="input-dark w-full p-3 rounded-lg text-sm mb-3" placeholder="Nome do Advogado">
-                <input type="text" id="advOAB" class="input-dark w-full p-3 rounded-lg text-sm mb-3" placeholder="Número da OAB">
-                <textarea id="advEndereco" rows="2" class="input-dark w-full p-3 rounded-lg text-sm resize-none" placeholder="Endereço Profissional"></textarea>
+            <div class="pt-6 border-t border-bordercolor">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Assinatura</label>
+                <input type="text" id="advNome" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white mb-2" placeholder="Nome">
+                <input type="text" id="advOAB" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white mb-2" placeholder="OAB">
+                <textarea id="advEndereco" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white resize-none" rows="2" placeholder="Endereço"></textarea>
             </div>
         </div>
     </aside>
 
-    <main class="flex-1 flex flex-col h-full overflow-hidden relative">
-        <div class="md:hidden flex items-center justify-between p-4 border-b border-bordercolor bg-panel shadow-lg z-20">
-            <span class="font-serif font-bold text-white tracking-tight">M.A <span class="text-brand-500 text-xs uppercase">Premium</span></span>
-            <button onclick="toggleMenu()" class="text-brand-400 p-2"><i class="fa-solid fa-bars text-xl"></i></button>
+    <main class="flex-1 flex flex-col overflow-hidden">
+        <div class="md:hidden flex justify-between p-4 bg-panel border-b border-bordercolor">
+            <span class="font-bold text-brand-500">M.A ELITE</span>
+            <button onclick="toggleMenu()" class="text-white"><i class="fa-solid fa-bars"></i></button>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-6 md:p-12 pb-32">
-            <div class="max-w-5xl mx-auto">
-                <header class="mb-10 text-center md:text-left">
-                    <h2 class="text-3xl md:text-4xl font-serif text-white mb-2 font-bold italic">M.A | <span class="text-brand-500">Jus IA Experience</span></h2>
-                    <p class="text-slate-400 text-lg">Análise profunda de mérito e estratégia processual.</p>
+        <div class="flex-1 overflow-y-auto p-6 md:p-10">
+            <div class="max-w-6xl mx-auto space-y-8">
+                <header>
+                    <h2 class="text-4xl font-serif font-bold text-white italic">Motor de <span class="text-brand-500">Combate Jurídico</span></h2>
+                    <p class="text-slate-400">Extração multimodal, cronologia e análise de vulnerabilidades.</p>
                 </header>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                    <div class="lg:col-span-2 glass-card rounded-2xl p-4 shadow-inner">
-                        <textarea id="fatosCaso" rows="8" class="w-full bg-transparent p-2 text-slate-200 placeholder-slate-700 outline-none resize-none text-lg font-serif" placeholder="Narre os fatos ou cole as instruções aqui..."></textarea>
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="lg:col-span-3 glass rounded-2xl p-6">
+                        <textarea id="fatosCaso" rows="8" class="w-full bg-transparent text-lg text-slate-200 outline-none resize-none" placeholder="Relate o caso ou suba arquivos de áudio/vídeo da audiência..."></textarea>
                     </div>
-                    <div class="lg:col-span-1">
-                        <div class="border-2 border-dashed border-slate-800 h-full rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 hover:bg-brand-500/5 transition-all" onclick="document.getElementById('arquivosPDF').click()">
-                            <input type="file" id="arquivosPDF" multiple accept=".pdf" class="hidden" onchange="mostrarNomesArquivos()">
-                            <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-700 mb-3"></i>
-                            <p class="text-xs text-slate-500 font-bold uppercase tracking-widest" id="textoArquivos">Anexar Autos em PDF</p>
+                    <div class="lg:col-span-1 flex flex-col gap-4">
+                        <div class="flex-1 border-2 border-dashed border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 transition-all" onclick="document.getElementById('arquivos').click()">
+                            <input type="file" id="arquivos" multiple accept=".pdf,audio/*,video/*" class="hidden" onchange="updateFileLabel()">
+                            <i class="fa-solid fa-folder-open text-3xl text-slate-600 mb-2"></i>
+                            <p class="text-[10px] uppercase font-bold text-slate-500" id="fileLabel">Anexar Autos & Mídia</p>
                         </div>
+                        <button onclick="processar()" class="btn-premium p-5 rounded-2xl font-bold text-white ai-glow">ANÁLISE MULTIMODAL</button>
                     </div>
                 </div>
 
-                <button onclick="enviarParaAPI()" class="btn-glow text-white px-8 py-5 rounded-2xl font-bold w-full flex items-center justify-center gap-4 text-lg shadow-xl">
-                    <i class="fa-solid fa-brain"></i> PROCESSAR INTELIGÊNCIA JURÍDICA
-                </button>
-
-                <div id="loadingArea" class="hidden py-16 flex flex-col items-center justify-center space-y-4 text-center">
-                    <div class="ai-pulse"></div>
-                    <p class="text-brand-400 animate-pulse font-medium tracking-wide">M.A está realizando o cruzamento de dados e jurisprudência...</p>
+                <div id="loader" class="hidden text-center py-10">
+                    <div class="inline-block w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Cruzando depoimentos e autos...</p>
                 </div>
 
-                <div id="resultadoArea" class="hidden mt-10 space-y-10">
-                    
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="glass-card rounded-2xl p-6 border-l-4 border-l-brand-500 shadow-2xl">
-                            <h3 class="text-xs font-black text-brand-400 uppercase tracking-tighter mb-3">Parecer de Mérito</h3>
-                            <p id="resumoEstrategico" class="text-slate-100 leading-relaxed font-serif text-lg italic"></p>
+                <div id="results" class="hidden space-y-8">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-xs font-black text-brand-500 uppercase mb-6"><i class="fa-solid fa-clock-rotate-left mr-2"></i> Linha do Tempo</h3>
+                            <div id="timelineContainer" class="ml-4 border-l border-slate-700 pl-6 space-y-6 relative"></div>
                         </div>
-                        
-                        <div class="glass-card rounded-2xl p-6 border-l-4 border-l-emerald-500">
-                            <h3 class="text-xs font-black text-emerald-400 uppercase tracking-tighter mb-3">Checklist de Provas & Providências</h3>
-                            <ul id="checklistProvas" class="space-y-2"></ul>
+                        <div class="glass rounded-2xl p-6 border-t-4 border-red-500">
+                            <h3 class="text-xs font-black text-red-500 uppercase mb-6"><i class="fa-solid fa-shield-crack mr-2"></i> Vulnerabilidades Contraparte</h3>
+                            <ul id="vulnerabilidades" class="space-y-4"></ul>
                         </div>
-                    </div>
-
-                    <div class="glass-card rounded-3xl overflow-hidden shadow-2xl border border-white/5">
-                        <div class="flex border-b border-bordercolor bg-panel/50 backdrop-blur-md">
-                            <button onclick="mudarTab('legal')" id="tab-legal" class="flex-1 p-5 text-xs font-black uppercase tracking-widest tab-active">Fundamentação Legal</button>
-                            <button onclick="mudarTab('juris')" id="tab-juris" class="flex-1 p-5 text-xs font-black uppercase tracking-widest text-slate-500">Jurisprudência Recente</button>
-                            <button onclick="mudarTab('doutrina')" id="tab-doutrina" class="flex-1 p-5 text-xs font-black uppercase tracking-widest text-slate-500">Doutrina e Teses</button>
-                        </div>
-                        <div class="p-8 bg-panel/30">
-                            <ul id="listaLegal" class="space-y-4"></ul>
-                            <ul id="listaJuris" class="hidden space-y-4"></ul>
-                            <ul id="listaDoutrina" class="hidden space-y-4"></ul>
+                        <div class="glass rounded-2xl p-6">
+                            <h3 class="text-xs font-black text-emerald-500 uppercase mb-6"><i class="fa-solid fa-bolt mr-2"></i> Parecer Estratégico</h3>
+                            <p id="parecer" class="text-slate-300 text-sm italic leading-relaxed"></p>
                         </div>
                     </div>
 
-                    <div class="glass-card rounded-3xl p-8 border border-brand-500/20 shadow-2xl bg-gradient-to-b from-panel to-deep">
-                        <div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
-                            <div class="flex items-center gap-4">
-                                <div class="p-3 bg-brand-500/10 rounded-xl">
-                                    <i class="fa-solid fa-file-signature text-2xl text-brand-400"></i>
-                                </div>
-                                <div>
-                                    <h3 class="text-xl font-serif text-white font-bold">Minuta Processual Elaborada</h3>
-                                    <p class="text-xs text-slate-500 font-sans uppercase">Padrão ABNT - Pronta para Revisão</p>
-                                </div>
-                            </div>
-                            <button onclick="baixarWord()" class="bg-brand-600 hover:bg-brand-500 text-white px-10 py-4 rounded-xl font-bold text-sm w-full md:w-auto transition-all shadow-lg hover:shadow-brand-500/20">
-                                <i class="fa-solid fa-file-word mr-2"></i> GERAR DOCUMENTO (.DOCX)
-                            </button>
+                    <div class="glass rounded-3xl p-8 border border-white/5">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="font-serif text-2xl text-white">Minuta de Alta Performance</h3>
+                            <button onclick="baixarDoc()" class="bg-white text-black px-6 py-2 rounded-lg font-bold text-xs hover:bg-brand-500 hover:text-white transition-all">EXPORTAR WORD</button>
                         </div>
-                        <textarea id="textoPeca" rows="18" class="input-dark w-full p-6 rounded-2xl text-sm font-serif leading-relaxed text-slate-300 bg-black/40"></textarea>
+                        <textarea id="peca" rows="20" class="w-full bg-deep/50 p-6 rounded-2xl text-sm font-serif leading-relaxed text-slate-400 border border-white/5"></textarea>
                     </div>
                 </div>
             </div>
@@ -158,105 +118,67 @@
     </main>
 
     <script>
-        function toggleMenu() {
-            const s = document.getElementById('sidebar');
-            s.classList.toggle('hidden');
-            s.classList.toggle('flex');
-        }
+        function toggleMenu() { document.getElementById('sidebar').classList.toggle('hidden'); document.getElementById('sidebar').classList.toggle('flex'); }
+        function updateFileLabel() { const c = document.getElementById('arquivos').files.length; document.getElementById('fileLabel').innerText = c + " ARQUIVOS CARREGADOS"; }
 
-        function mudarTab(tipo) {
-            ['legal', 'juris', 'doutrina'].forEach(t => {
-                document.getElementById('lista' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
-                document.getElementById('tab-' + t).classList.remove('tab-active');
-                document.getElementById('tab-' + t).classList.add('text-slate-500');
-            });
-            document.getElementById('lista' + tipo.charAt(0).toUpperCase() + tipo.slice(1)).classList.remove('hidden');
-            document.getElementById('tab-' + tipo).classList.add('tab-active');
-            document.getElementById('tab-' + tipo).classList.remove('text-slate-500');
-        }
-
-        function mostrarNomesArquivos() {
-            const input = document.getElementById('arquivosPDF');
-            document.getElementById('textoArquivos').innerHTML = `<span class="text-brand-400">${input.files.length} DOCUMENTO(S) PRONTOS</span>`;
-        }
-
-        async function enviarParaAPI() {
+        async function processar() {
             const apiKey = document.getElementById('apiKey').value;
-            const fatos = document.getElementById('fatosCaso').value;
-            if(!apiKey || !fatos) return alert("Por favor, insira sua Chave API e narre os fatos.");
+            if(!apiKey) return alert("Insira a API Key");
+            
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
 
-            if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('hidden');
-            document.getElementById('loadingArea').classList.remove('hidden');
-            document.getElementById('resultadoArea').classList.add('hidden');
-
-            const formData = new FormData();
-            formData.append("api_key", apiKey);
-            formData.append("fatos_do_caso", fatos);
-            formData.append("area_direito", document.getElementById('areaDireito').value);
-            const files = document.getElementById('arquivosPDF').files;
-            for(let i=0; i<files.length; i++) formData.append("arquivos", files[i]);
+            const fd = new FormData();
+            fd.append("api_key", apiKey);
+            fd.append("fatos_do_caso", document.getElementById('fatosCaso').value);
+            fd.append("area_direito", document.getElementById('areaDireito').value);
+            const files = document.getElementById('arquivos').files;
+            for(let f of files) fd.append("arquivos", f);
 
             try {
-                const res = await fetch('/analisar', { method: 'POST', body: formData });
+                const res = await fetch('/analisar', { method: 'POST', body: fd });
                 const d = await res.json();
-                
-                if (d.erro) {
-                    throw new Error(d.erro);
-                }
 
-                document.getElementById('resumoEstrategico').innerText = d.resumo_estrategico;
+                document.getElementById('parecer').innerText = d.resumo_estrategico;
+                document.getElementById('peca').value = d.peca_processual;
 
-                // Checklist Dinâmico da IA
-                const listCheck = document.getElementById('checklistProvas');
-                listCheck.innerHTML = '';
-                (d.checklist || []).forEach(p => {
-                    listCheck.innerHTML += `<li class="check-item flex items-center gap-3 p-2 rounded-lg text-xs text-slate-300 italic"><i class="fa-regular fa-square-check text-emerald-500"></i> ${p}</li>`;
+                // Render Timeline
+                const tc = document.getElementById('timelineContainer');
+                tc.innerHTML = '';
+                d.timeline.forEach(t => {
+                    tc.innerHTML += `<div class="timeline-item relative">
+                        <span class="text-[10px] font-bold text-brand-500">${t.data}</span>
+                        <p class="text-xs text-white font-medium">${t.evento}</p>
+                        ${t.alerta ? `<p class="text-[9px] text-red-400 mt-1 italic">⚠️ ${t.alerta}</p>` : ''}
+                    </div>`;
                 });
-                
-                const carregarLista = (lista, id, icon, color) => {
-                    const el = document.getElementById(id);
-                    el.innerHTML = '';
-                    (lista || []).forEach(item => {
-                        el.innerHTML += `<li class="p-4 bg-white/5 rounded-xl border border-white/5 text-sm leading-relaxed"><i class="fa-solid ${icon} mr-3 ${color}"></i> ${item}</li>`;
-                    });
-                };
 
-                carregarLista(d.base_legal, 'listaLegal', 'fa-book-open', 'text-emerald-400');
-                carregarLista(d.jurisprudencia, 'listaJuris', 'fa-gavel', 'text-amber-400');
-                carregarLista(d.doutrina, 'listaDoutrina', 'fa-pen-fancy', 'text-brand-400');
-                
-                document.getElementById('textoPeca').value = d.peca_processual;
-                document.getElementById('loadingArea').classList.add('hidden');
-                document.getElementById('resultadoArea').classList.remove('hidden');
-            } catch (e) { 
-                alert("Erro: " + e.message); 
-                document.getElementById('loadingArea').classList.add('hidden'); 
-            }
+                // Render Vulnerabilidades
+                const vc = document.getElementById('vulnerabilidades');
+                vc.innerHTML = '';
+                d.vulnerabilidades_contraparte.forEach(v => {
+                    vc.innerHTML += `<li class="p-3 bg-red-500/5 border border-red-500/20 rounded-lg text-xs text-slate-400"><i class="fa-solid fa-crosshairs text-red-500 mr-2"></i> ${v}</li>`;
+                });
+
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('results').classList.remove('hidden');
+            } catch (e) { alert("Erro no processamento."); document.getElementById('loader').classList.add('hidden'); }
         }
 
-        async function baixarWord() {
-            const payload = {
-                texto_peca: document.getElementById('textoPeca').value,
-                advogado_nome: document.getElementById('advNome').value,
-                advogado_oab: document.getElementById('advOAB').value,
-                advogado_endereco: document.getElementById('advEndereco').value
-            };
-            try {
-                const res = await fetch('/gerar_docx', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (!res.ok) throw new Error("Erro ao gerar Word");
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = "Peca_Processual_MA_Premium.docx";
-                a.click();
-            } catch (e) {
-                alert("Erro ao baixar arquivo: " + e.message);
-            }
+        async function baixarDoc() {
+            const res = await fetch('/gerar_docx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    texto_peca: document.getElementById('peca').value,
+                    advogado_nome: document.getElementById('advNome').value,
+                    advogado_oab: document.getElementById('advOAB').value,
+                    advogado_endereco: document.getElementById('advEndereco').value
+                })
+            });
+            const b = await res.blob();
+            const u = window.URL.createObjectURL(b);
+            const a = document.createElement('a'); a.href = u; a.download = "MA_Elite_Estrategia.docx"; a.click();
         }
     </script>
 </body>
