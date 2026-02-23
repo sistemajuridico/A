@@ -4,6 +4,7 @@ import json
 import shutil
 import time
 import uuid
+import unicodedata # NOVO: Para limpar caracteres invisíveis de PDFs
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -16,8 +17,8 @@ from google.genai import types
 
 app = FastAPI()
 
-# --- 1. MIDDLEWARE DE PROTEÇÃO: Limita o Upload a 50MB ---
-MAX_UPLOAD_SIZE = 50 * 1024 * 1024  
+# --- 1. MIDDLEWARE: Aumentado para 300MB para aceitar os vários volumes ao mesmo tempo ---
+MAX_UPLOAD_SIZE = 300 * 1024 * 1024  
 
 @app.middleware("http")
 async def limit_upload_size(request: Request, call_next):
@@ -25,12 +26,11 @@ async def limit_upload_size(request: Request, call_next):
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > MAX_UPLOAD_SIZE:
             return JSONResponse(
-                {"erro": "Arquivo muito grande. O limite máximo é de 50MB. Comprima o PDF antes de enviar."},
+                {"erro": "A soma total dos ficheiros excede 300MB. Envie menos volumes por vez."},
                 status_code=413
             )
     return await call_next(request)
 
-# Dicionário em memória para guardar o status das análises
 TASKS = {}
 
 @app.get("/")
@@ -57,11 +57,9 @@ def comprimir_audio(input_path, output_path):
     except Exception as e:
         return False
 
-# NÚCLEO EM 2º PLANO: Processa COMPRESSÃO e IA fora da ligação principal
 def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_brutos: list):
     arquivos_para_gemini = []
     try:
-        # --- AJUSTE: A COMPRESSÃO AGORA ACONTECE NO BACKGROUND ---
         for temp_input, ext, safe_name in arquivos_brutos:
             target_file = temp_input
             mime = "application/pdf"
@@ -83,8 +81,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                     
             arquivos_para_gemini.append((target_file, mime))
 
-        # --- FIM DO AJUSTE ---
-
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             TASKS[task_id] = {"status": "error", "erro": "Chave API não configurada."}
@@ -104,20 +100,13 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 time.sleep(3)
             conteudos_multimais.append(f_info)
 
-        # PROMPT AGRESSIVO QUE GARANTE A PEÇA COMPLETA
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         Use Google Search para o magistrado '{mag}' no '{trib}'.
         
         ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
         Você DEVE redigir a PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
-        Inclua obrigatoriamente: 
-        1. Endereçamento correto.
-        2. Qualificação completa (use colchetes [ ] para dados faltantes).
-        3. Dos Fatos (narrativa persuasiva).
-        4. Do Direito (fundamentação profunda conectando lei, doutrina e a jurisprudência pesquisada ao caso concreto).
-        5. Dos Pedidos (específicos, claros e com requerimento de provas).
-        6. Valor da causa e fecho formal.
+        Inclua obrigatoriamente: Endereçamento correto, Qualificação completa, Dos Fatos, Do Direito, Dos Pedidos e Fecho formal.
 
         RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
         {{
@@ -146,12 +135,13 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
 
     except Exception as e:
-        TASKS[task_id] = {"status": "error", "erro": "Erro no processamento. O arquivo pode estar protegido ou o modelo falhou."}
+        # Limpeza forçada do erro para nunca dar o erro \u0303 na tela novamente
+        erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
+        TASKS[task_id] = {"status": "error", "erro": f"Erro na IA: {erro_seguro}"}
     finally:
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
 
-# --- 2. LEITURA ASSÍNCRONA EM CHUNKS (SUPER RÁPIDA) ---
 @app.post("/analisar")
 async def analisar_caso(
     background_tasks: BackgroundTasks,
@@ -161,7 +151,12 @@ async def analisar_caso(
     tribunal: str = Form(default=""),
     arquivos: Optional[List[UploadFile]] = File(default=[])
 ):
-    if not fatos_do_caso or len(fatos_do_caso.strip()) < 5:
+    # Desinfeção de caracteres "fantasmas" (Remove o problema do \u0303 copiado do PDF)
+    fatos_limpos = unicodedata.normalize('NFC', fatos_do_caso) if fatos_do_caso else ""
+    mag_limpo = unicodedata.normalize('NFC', magistrado) if magistrado else ""
+    trib_limpo = unicodedata.normalize('NFC', tribunal) if tribunal else ""
+
+    if not fatos_limpos or len(fatos_limpos.strip()) < 5:
         return JSONResponse(content={"erro": "Descreva os fatos."}, status_code=400)
 
     task_id = str(uuid.uuid4())
@@ -173,27 +168,23 @@ async def analisar_caso(
             for arquivo in arquivos:
                 if not arquivo.filename: continue
                 ext = arquivo.filename.lower().split('.')[-1]
-                
-                # Nomes seguros gerados por UUID
                 safe_name = f"doc_{uuid.uuid4().hex}.{ext}"
                 temp_input = f"temp_in_{safe_name}"
                 
-                # Leitura dividida inteligente (Chunks)
                 with open(temp_input, "wb") as buffer:
                     while True:
-                        chunk = await arquivo.read(1024 * 1024) # 1MB
+                        chunk = await arquivo.read(1024 * 1024)
                         if not chunk:
                             break
                         buffer.write(chunk)
                 
-                # Apenas guarda o caminho bruto, a compressão vai para o background
                 arquivos_brutos.append((temp_input, ext, safe_name))
                 
     except Exception as e:
-        return JSONResponse(content={"erro": "Erro de codificação ao salvar o arquivo no servidor."}, status_code=500)
+        return JSONResponse(content={"erro": "Erro de codificação ao salvar o arquivo."}, status_code=500)
 
-    # Inicia a IA em 2º plano e liberta o frontend de imediato!
-    background_tasks.add_task(processar_background, task_id, fatos_do_caso, area_direito, magistrado, tribunal, arquivos_brutos)
+    # Inicia a IA com os textos limpos
+    background_tasks.add_task(processar_background, task_id, fatos_limpos, area_direito, mag_limpo, trib_limpo, arquivos_brutos)
     
     return JSONResponse(content={"task_id": task_id})
 
@@ -201,7 +192,7 @@ async def analisar_caso(
 def check_status(task_id: str):
     task = TASKS.get(task_id)
     if not task:
-        return JSONResponse(content={"status": "error", "erro": "Tarefa perdida ou expirada."})
+        return JSONResponse(content={"status": "error", "erro": "Tarefa perdida."})
     return JSONResponse(content=task)
 
 class DadosPeca(BaseModel):
@@ -220,10 +211,7 @@ def gerar_docx(dados: DadosPeca):
         if dados.advogado_nome:
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            nome = str(dados.advogado_nome).upper()
-            oab = str(dados.advogado_oab) if dados.advogado_oab else "---"
-            end = str(dados.advogado_endereco) if dados.advogado_endereco else ""
-            run_h = p.add_run(f"{nome}\nOAB: {oab}\n{end}")
+            run_h = p.add_run(f"{str(dados.advogado_nome).upper()}\nOAB: {dados.advogado_oab if dados.advogado_oab else '---'}\n{dados.advogado_endereco if dados.advogado_endereco else ''}")
             run_h.font.size, run_h.font.name, run_h.italic = Pt(10), 'Times New Roman', True
 
         for linha in dados.texto_peca.split('\n'):
