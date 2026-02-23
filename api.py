@@ -25,10 +25,9 @@ async def serve_index():
     """Serve a interface principal do M.A"""
     return FileResponse("index.html")
 
-# --- FERRAMENTAS DE COMPRESSÃO (Otimizadas para Render Free) ---
+# --- FERRAMENTAS DE TRATAMENTO ---
 
 def extrair_texto_pdf(file_bytes):
-    """Extrai texto de documentos PDF"""
     texto = ""
     try:
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
@@ -41,7 +40,6 @@ def extrair_texto_pdf(file_bytes):
     return texto
 
 def comprimir_video(input_path, output_path):
-    """Reduz vídeo para caber nos 512MB de RAM do Render"""
     try:
         with VideoFileClip(input_path) as video:
             video_redimensionado = video.resize(height=480)
@@ -52,7 +50,6 @@ def comprimir_video(input_path, output_path):
         return False
 
 def comprimir_audio(input_path, output_path):
-    """Otimiza áudio para análise de IA"""
     try:
         audio = AudioSegment.from_file(input_path)
         audio = audio.set_channels(1).set_frame_rate(16000)
@@ -73,85 +70,59 @@ async def analisar_caso(
     arquivos: List[UploadFile] = None
 ):
     try:
-        # CAPTURA DA CHAVE CONFIGURADA NO RENDER
         api_key = os.getenv("GEMINI_API_KEY")
-        
         if not api_key:
-            return JSONResponse(content={"erro": "Configure a GEMINI_API_KEY no painel do Render."}, status_code=500)
+            return JSONResponse(content={"erro": "Chave API não configurada no Render."}, status_code=500)
 
         conteudos_multimais = []
         texto_autos = ""
 
-        # PROCESSAMENTO DE ANEXOS
         if arquivos:
             for arquivo in arquivos:
                 ext = arquivo.filename.lower().split('.')[-1]
                 corpo = await arquivo.read()
-                
-                temp_in = f"in_{arquivo.filename}"
-                temp_out = f"proc_{arquivo.filename}"
-                
-                with open(temp_in, "wb") as f:
-                    f.write(corpo)
+                temp_in, temp_out = f"in_{arquivo.filename}", f"proc_{arquivo.filename}"
+                with open(temp_in, "wb") as f: f.write(corpo)
 
                 if ext == "pdf":
-                    texto_autos += f"\n[ARQUIVO: {arquivo.filename}]\n{extrair_texto_pdf(corpo)}"
-                
+                    texto_autos += f"\n[DOC: {arquivo.filename}]\n{extrair_texto_pdf(corpo)}"
                 elif ext in ["mp4", "mov", "avi"]:
                     if comprimir_video(temp_in, temp_out):
                         with open(temp_out, "rb") as f:
                             conteudos_multimais.append(types.Part.from_bytes(data=f.read(), mime_type="video/mp4"))
-                
                 elif ext in ["mp3", "wav", "m4a"]:
                     if comprimir_audio(temp_in, temp_out):
                         with open(temp_out, "rb") as f:
                             conteudos_multimais.append(types.Part.from_bytes(data=f.read(), mime_type="audio/mp3"))
 
-                # Limpeza de arquivos temporários
                 for f_temp in [temp_in, temp_out]:
                     if os.path.exists(f_temp): os.remove(f_temp)
 
-        # INICIALIZAÇÃO DO CLIENTE GOOGLE GENAI 0.2.0
         client = genai.Client(api_key=api_key)
 
-        # --- BLOCO DE DIAGNÓSTICO (LISTAGEM DE MODELOS NOS LOGS) ---
-        print("--- [DIAGNÓSTICO M.A] MODELOS DISPONÍVEIS NA SUA CONTA PAGA ---")
+        # DIAGNÓSTICO DE MODELOS
+        print("--- [DIAGNÓSTICO] MODELOS DISPONÍVEIS ---")
         try:
-            for m in client.models.list():
-                print(f"Disponível: {m.name}")
-        except Exception as d_err:
-            print(f"Falha ao listar modelos: {d_err}")
-        # -----------------------------------------------------------
+            for m in client.models.list(): print(f"Disponível: {m.name}")
+        except: pass
 
-        instrucoes_juridicas = f"""
-        Você é o M.A | JUS IA EXPERIENCE, a inteligência jurídica de elite para {area_direito}.
-        
-        TAREFAS DE ALTO NÍVEL:
-        1. JURIMETRIA: Use Google Search para analisar o magistrado '{magistrado}' no '{tribunal}'.
-        2. ESTRATÉGIA: Identifique falhas na narrativa da contraparte e aponte teses vencedoras.
-        3. VISUAL LAW: Crie uma petição persuasiva, moderna e pronta para o protocolo.
-
-        RESPOSTA OBRIGATÓRIA EM JSON:
+        instrucoes = f"""
+        Você é o M.A | JUS IA EXPERIENCE. Especialidade: {area_direito}.
+        Use Google Search para o magistrado '{magistrado}' no '{tribunal}'.
+        RETORNE ESTRITAMENTE EM JSON, sem textos explicativos antes ou depois:
         {{
-            "resumo_estrategico": "Análise técnica profunda",
-            "jurimetria": "Comportamento do juiz/tribunal",
-            "resumo_cliente": "Explicação simples para WhatsApp",
-            "timeline": [{{ "data": "DD/MM/AAAA", "evento": "descrição" }}],
-            "vulnerabilidades_contraparte": ["Ponto A", "Ponto B"],
-            "checklist": ["Ação 1", "Ação 2"],
-            "base_legal": ["Artigos fundamentais"],
-            "jurisprudencia": ["Precedentes reais"],
-            "doutrina": ["Autores de peso"],
-            "peca_processual": "Texto completo da petição"
+            "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
+            "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
+            "base_legal": [], "jurisprudencia": [], "doutrina": [], "peca_processual": "..."
         }}
         """
 
-        prompt_final = [f"{instrucoes_juridicas}\n\nAUTOS EXTRAÍDOS:\n{texto_autos}\n\nFATOS NARRADOS:\n{fatos_do_caso}"]
+        prompt_final = [f"{instrucoes}\n\nAUTOS:\n{texto_autos}\n\nFATOS:\n{fatos_do_caso}"]
         prompt_final.extend(conteudos_multimais)
 
-        # MOTOR DE ELITE ATUALIZADO PARA 2026 (EVITA ERRO 404)
+        # CONFIGURAÇÃO SEM CONFLITO (REMOVEU-SE O RESPONSE_MIME_TYPE)
         response = client.models.generate_content(
-            model='gemini-2.5-flash', # O padrão de estabilidade para novas contas pagas em 2026
+            model='gemini-2.5-flash', 
             contents=prompt_final,
             config=types.GenerateContentConfig(
                 temperature=0.1,
@@ -159,14 +130,20 @@ async def analisar_caso(
             )
         )
 
-        return JSONResponse(content=json.loads(response.text))
+        # --- LIMPEZA DE JSON (CORRIGE O ERRO DE COLUNA 1) ---
+        texto_limpo = response.text.strip()
+        if texto_limpo.startswith("```json"):
+            texto_limpo = texto_limpo.replace("```json", "", 1)
+        if texto_limpo.endswith("```"):
+            texto_limpo = texto_limpo.rsplit("```", 1)[0]
+        
+        return JSONResponse(content=json.loads(texto_limpo.strip()))
 
     except Exception as e:
-        # IMPRIME O ERRO REAL NOS LOGS DO RENDER PARA ANÁLISE
-        print(f"--- ERRO DETECTADO NO M.A ---: {str(e)}")
+        print(f"--- ERRO CRÍTICO NO M.A ---: {str(e)}")
         return JSONResponse(content={"erro": str(e)}, status_code=500)
 
-# --- GERADOR DE DOCUMENTOS WORD ---
+# --- GERADOR DE DOCX ---
 
 class DadosPeca(BaseModel):
     texto_peca: str
@@ -177,18 +154,15 @@ class DadosPeca(BaseModel):
 @app.post("/gerar_docx")
 async def gerar_docx(dados: DadosPeca):
     doc = docx.Document()
-    # Padrão de Margens Jurídicas
     for s in doc.sections:
-        s.top_margin, s.bottom_margin = Cm(3), Cm(2)
-        s.left_margin, s.right_margin = Cm(3), Cm(2)
+        s.top_margin, s.bottom_margin, s.left_margin, s.right_margin = Cm(3), Cm(2), Cm(3), Cm(2)
 
     if dados.advogado_nome:
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         header = f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}"
         run = p.add_run(header)
-        run.font.size, run.font.name = Pt(10), 'Times New Roman'
-        run.italic = True
+        run.font.size, run.font.name, run.italic = Pt(10), 'Times New Roman', True
 
     for linha in dados.texto_peca.split('\n'):
         if linha.strip():
@@ -200,4 +174,4 @@ async def gerar_docx(dados: DadosPeca):
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Estrategia_Elite.docx"})
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Estrategia.docx"})
