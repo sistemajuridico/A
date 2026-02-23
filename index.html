@@ -102,6 +102,17 @@
                 </div>
 
                 <div id="results" class="hidden space-y-8 pb-20">
+                    
+                    <div class="glass rounded-2xl p-6 border border-brand-500/30 flex flex-col md:flex-row justify-between items-center bg-brand-500/5 shadow-lg">
+                        <div>
+                            <h3 class="font-serif text-xl text-white font-bold">Diagnóstico Finalizado</h3>
+                            <p class="text-slate-400 text-sm">Visualize os painéis abaixo ou faça o download da análise estratégica completa.</p>
+                        </div>
+                        <button onclick="baixarDossieCompleto()" class="mt-4 md:mt-0 btn-premium px-6 py-3 rounded-xl font-bold text-xs text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] flex items-center gap-2 hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-file-word text-lg"></i> BAIXAR DOSSIÊ COMPLETO
+                        </button>
+                    </div>
+
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div class="glass rounded-2xl p-6">
                             <h3 class="text-xs font-black text-brand-500 uppercase mb-6">Cronologia</h3>
@@ -147,7 +158,7 @@
                     <div class="glass rounded-3xl p-8 border border-brand-500/20 shadow-2xl">
                         <div class="flex justify-between items-center mb-6">
                             <h3 class="font-serif text-2xl text-white">Minuta Processual de Elite</h3>
-                            <button onclick="baixarDoc()" class="bg-white text-black px-6 py-3 rounded-xl font-bold text-xs hover:bg-brand-500 hover:text-white transition-all shadow-lg">GERAR WORD (.DOCX)</button>
+                            <button onclick="baixarDoc()" class="bg-white text-black px-6 py-3 rounded-xl font-bold text-xs hover:bg-brand-500 hover:text-white transition-all shadow-lg">BAIXAR APENAS PETIÇÃO</button>
                         </div>
                         <textarea id="peca" rows="20" class="w-full bg-deep/50 p-6 rounded-2xl text-sm font-serif leading-relaxed text-slate-400 border border-white/5 outline-none"></textarea>
                     </div>
@@ -157,6 +168,9 @@
     </main>
 
     <script>
+        // Variável global para guardar a análise e permitir o download depois
+        let analiseGlobal = null; 
+
         function toggleMenu() { document.getElementById('sidebar').classList.toggle('hidden'); document.getElementById('sidebar').classList.toggle('flex'); }
         function updateFileLabel() { const c = document.getElementById('arquivos').files.length; document.getElementById('fileLabel').innerText = c + " ARQUIVOS PRONTOS"; }
 
@@ -185,6 +199,7 @@
             loader.classList.remove('hidden');
             results.classList.add('hidden');
             btn.disabled = true;
+            analiseGlobal = null; // Reseta a análise anterior
 
             const fd = new FormData();
             fd.append("fatos_do_caso", fatos);
@@ -204,6 +219,7 @@
                 }
 
                 const d = await res.json();
+                analiseGlobal = d; // Guarda os dados para o Dossiê Completo
 
                 document.getElementById('jurimetria').innerText = d.jurimetria || "Análise indisponível.";
                 document.getElementById('resumo_cliente').innerText = d.resumo_cliente || "";
@@ -250,6 +266,7 @@
             alert("Texto copiado!"); 
         }
 
+        // Função Antiga (Baixa só a Petição)
         async function baixarDoc() {
             const payload = {
                 texto_peca: document.getElementById('peca').value,
@@ -257,6 +274,67 @@
                 advogado_oab: document.getElementById('advOAB').value,
                 advogado_endereco: document.getElementById('advEndereco').value
             };
+            enviarParaServidorWord(payload, "MA_Minuta_Peticional.docx");
+        }
+
+        // NOVA FUNÇÃO: Gera o Dossiê Completo juntando todas as partes
+        async function baixarDossieCompleto() {
+            if (!analiseGlobal) return;
+
+            let textoCompleto = "M.A | JUS IA EXPERIENCE - DOSSIÊ ESTRATÉGICO COMPLETO\n\n";
+
+            if(analiseGlobal.jurimetria) {
+                textoCompleto += "=== JURIMETRIA E TENDÊNCIAS DO JUÍZO ===\n";
+                textoCompleto += analiseGlobal.jurimetria + "\n\n";
+            }
+
+            if(analiseGlobal.resumo_estrategico) {
+                textoCompleto += "=== RESUMO TÉCNICO ===\n";
+                textoCompleto += analiseGlobal.resumo_estrategico + "\n\n";
+            }
+
+            if(analiseGlobal.timeline && analiseGlobal.timeline.length > 0) {
+                textoCompleto += "=== CRONOLOGIA DO CASO ===\n";
+                analiseGlobal.timeline.forEach(t => { textoCompleto += `Data: ${t.data} | Evento: ${t.evento}\n`; });
+                textoCompleto += "\n";
+            }
+
+            if(analiseGlobal.vulnerabilidades_contraparte && analiseGlobal.vulnerabilidades_contraparte.length > 0) {
+                textoCompleto += "=== MODO COMBATE (VULNERABILIDADES DA CONTRAPARTE) ===\n";
+                analiseGlobal.vulnerabilidades_contraparte.forEach(v => { textoCompleto += `- ${v}\n`; });
+                textoCompleto += "\n";
+            }
+
+            if(analiseGlobal.checklist && analiseGlobal.checklist.length > 0) {
+                textoCompleto += "=== PROVIDÊNCIAS (CHECKLIST) ===\n";
+                analiseGlobal.checklist.forEach(c => { textoCompleto += `- ${c}\n`; });
+                textoCompleto += "\n";
+            }
+
+            if(analiseGlobal.base_legal && analiseGlobal.base_legal.length > 0) {
+                textoCompleto += "=== BASE LEGAL ===\n";
+                analiseGlobal.base_legal.forEach(b => { textoCompleto += `- ${b}\n`; });
+                textoCompleto += "\n";
+            }
+
+            if(analiseGlobal.jurisprudencia && analiseGlobal.jurisprudencia.length > 0) {
+                textoCompleto += "=== JURISPRUDÊNCIA APLICÁVEL ===\n";
+                analiseGlobal.jurisprudencia.forEach(j => { textoCompleto += `- ${j}\n`; });
+                textoCompleto += "\n";
+            }
+
+            const payload = {
+                texto_peca: textoCompleto,
+                advogado_nome: document.getElementById('advNome').value,
+                advogado_oab: document.getElementById('advOAB').value,
+                advogado_endereco: document.getElementById('advEndereco').value
+            };
+
+            enviarParaServidorWord(payload, "MA_Dossie_Estrategico_Completo.docx");
+        }
+
+        // Função utilitária para chamar o Python
+        async function enviarParaServidorWord(payload, nomeArquivo) {
             try {
                 const res = await fetch('/gerar_docx', {
                     method: 'POST',
@@ -266,8 +344,8 @@
                 if (!res.ok) throw new Error("Erro ao gerar documento.");
                 const b = await res.blob();
                 const u = window.URL.createObjectURL(b);
-                const a = document.createElement('a'); a.href = u; a.download = "MA_Elite_Estrategia.docx"; a.click();
-            } catch(e) { alert("Erro ao gerar o Word."); }
+                const a = document.createElement('a'); a.href = u; a.download = nomeArquivo; a.click();
+            } catch(e) { alert("Erro ao gerar o arquivo Word."); }
         }
     </script>
 </body>
