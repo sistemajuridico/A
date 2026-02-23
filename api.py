@@ -90,7 +90,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         for target_file, mime in arquivos_para_gemini:
             gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
-            # Esperar pelo estado 'ACTIVE' para a IA não rejeitar o ficheiro
             while True:
                 f_info = client.files.get(name=gemini_file.name)
                 state_str = str(f_info.state).upper()
@@ -101,6 +100,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 time.sleep(3)
             conteudos_multimais.append(f_info)
 
+        # DIAGNÓSTICO APLICADO: As instruções agora são tratadas isoladamente do conteúdo
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         Concentre-se na análise técnica, doutrinária e jurisprudencial.
@@ -118,22 +118,25 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         }}
         """
         
-        prompt_partes = [f"{instrucoes}\n\nFATOS:\n{fatos}"]
+        # O prompt_partes agora contém APENAS os dados e ficheiros, sem instruções de sistema misturadas
+        prompt_partes = [f"FATOS:\n{fatos}"]
         prompt_partes.extend(conteudos_multimais)
 
+        # DIAGNÓSTICO APLICADO: system_instruction e sintaxe da tool corrigidos
         if len(conteudos_multimais) > 0:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                system_instruction=instrucoes
             )
         else:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
                 response_mime_type="application/json",
-                tools=[{"google_search": {}}]
+                system_instruction=instrucoes,
+                tools=[{"googleSearch": {}}]  # Sintaxe estrita exigida pela SDK 0.2.0
             )
 
-        # Motor Liberado e Gratuito com 1 Milhão de Tokens
         response = client.models.generate_content(
             model='gemini-1.5-flash', 
             contents=prompt_partes,
@@ -238,4 +241,3 @@ def gerar_docx(dados: DadosPeca):
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
         return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
-
