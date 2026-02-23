@@ -98,7 +98,10 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 if "ACTIVE" in state_str:
                     break
                 time.sleep(3)
-            conteudos_multimais.append(f_info)
+            
+            conteudos_multimais.append(
+                types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
+            )
 
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
@@ -117,26 +120,44 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         }}
         """
         
-        # A ABORDAGEM RAIZ (A PROVA DE BALAS): Tudo numa única lista, ficheiros primeiro!
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
         prompt_partes.append(f"{instrucoes}\n\nFATOS:\n{fatos}")
 
-        # Configuração minimalista (Removidos 'response_mime_type' e 'system_instruction' que causam o erro)
+        # --- A VACINA DOS FILTROS (Permite analisar crimes, litígios e afins sem a Google bloquear) ---
+        filtros_seguranca = [
+            types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+        ]
+
         if len(conteudos_multimais) > 0:
-            config_ia = types.GenerateContentConfig(temperature=0.1)
+            config_ia = types.GenerateContentConfig(
+                temperature=0.1,
+                response_mime_type="application/json",
+                safety_settings=filtros_seguranca
+            )
         else:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
-                tools=[{"googleSearch": {}}]
+                response_mime_type="application/json",
+                tools=[{"googleSearch": {}}],
+                safety_settings=filtros_seguranca
             )
 
-        # O motor validado pela sua chave API
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
             contents=prompt_partes,
             config=config_ia
         )
+
+        # --- A REDE DE PROTEÇÃO CONTRA O NONETYPE ---
+        if getattr(response, 'text', None) is None:
+            motivo = "A Google bloqueou a resposta silenciosamente."
+            if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
+                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial da Google: {response.candidates[0].finish_reason}"
+            raise Exception(motivo)
 
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
@@ -148,7 +169,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
-        TASKS[task_id] = {"status": "error", "erro": f"Erro na IA: {erro_seguro}"}
+        TASKS[task_id] = {"status": "error", "erro": f"{erro_seguro}"}
     finally:
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
