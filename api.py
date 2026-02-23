@@ -35,6 +35,8 @@ async def analisar_caso(
     api_key: str = Form(...),
     fatos_do_caso: str = Form(...),
     area_direito: str = Form(...),
+    magistrado: str = Form(None),
+    tribunal: str = Form(None),
     arquivos: List[UploadFile] = None
 ):
     try:
@@ -45,38 +47,41 @@ async def analisar_caso(
             for arquivo in arquivos:
                 ext = arquivo.filename.lower().split('.')[-1]
                 corpo = await arquivo.read()
-                
                 if ext == "pdf":
                     texto_autos += f"\n[DOC: {arquivo.filename}]\n{extrair_texto_pdf(corpo)}"
                 elif ext in ["mp3", "mp4", "mpeg", "wav"]:
-                    # Envia arquivos de mídia diretamente para a multimodalidade do Gemini
                     conteudos_multimais.append(types.Part.from_bytes(data=corpo, mime_type=arquivo.content_type))
 
         client = genai.Client(api_key=api_key)
 
         instrucoes_sistema = f"""
-        Você é o M.A JURÍDICO ELITE. Sua especialidade é {area_direito}.
-        
-        Sua análise deve ser MULTIDIMENSIONAL:
-        1. LINHA DO TEMPO: Extraia todas as datas e crie uma cronologia. Identifique prescrições e contradições temporais.
-        2. MODO COMBATE: Analise documentos da contraparte. Identifique furos na narrativa, falta de provas e preveja a estratégia deles.
-        3. INTELIGÊNCIA DE AUDIÊNCIA: Se houver áudio/vídeo, transcreva pontos-chave e aponte contradições entre depoimentos e autos.
-        4. VISUAL LAW: A petição deve ser moderna, com tabelas comparativas (se útil) e tópicos claros.
+        Você é o M.A JURÍDICO ELITE. Especialista em {area_direito}.
+        Sua missão é fornecer Inteligência Estratégica Total.
 
-        RETORNE APENAS JSON:
+        OBJETIVOS OBRIGATÓRIOS:
+        1. JURIMETRIA: Pesquise tendências do magistrado '{magistrado}' no '{tribunal}'.
+        2. LINHA DO TEMPO: Cronologia detalhada de datas e fatos.
+        3. MODO COMBATE: Identifique vulnerabilidades na narrativa da contraparte.
+        4. TRADUÇÃO CLIENTE: Texto simples para WhatsApp explicando o status do caso.
+        5. DOUTRINA E JURISPRUDÊNCIA: Use Google Search para citações REAIS e atuais.
+        6. PEÇA PROCESSUAL: Redija com Visual Law e formatação técnica.
+
+        RETORNE APENAS JSON PURO:
         {{
-            "resumo_estrategico": "Análise de alto nível + chances de êxito",
-            "timeline": [{{ "data": "DD/MM/AAAA", "evento": "descrição", "alerta": "prescrição/contradição?" }}],
-            "vulnerabilidades_contraparte": ["Furo 1", "Ponto fraco 2"],
-            "checklist": ["Providência 1", "Provas a coletar"],
-            "base_legal": ["Leis/Súmulas"],
-            "jurisprudencia": ["Precedentes reais"],
-            "doutrina": ["Doutrina de peso"],
-            "peca_processual": "Petição completa com Visual Law estruturado"
+            "resumo_estrategico": "Análise técnica de mérito",
+            "jurimetria": "Tendências e perfil do magistrado",
+            "resumo_cliente": "Texto amigável para WhatsApp",
+            "timeline": [{{ "data": "DD/MM/AAAA", "evento": "descrição", "alerta": "opcional" }}],
+            "vulnerabilidades_contraparte": ["Ponto 1", "Ponto 2"],
+            "checklist": ["Providência 1", "Prova 2"],
+            "base_legal": ["Artigos"],
+            "jurisprudencia": ["Precedentes"],
+            "doutrina": ["Autores"],
+            "peca_processual": "Petição completa"
         }}
         """
 
-        prompt = [f"{instrucoes_sistema}\n\nAUTOS TEXTUAIS:\n{texto_autos}\n\nFATOS/INSTRUÇÕES:\n{fatos_do_caso}"]
+        prompt = [f"{instrucoes_sistema}\n\nAUTOS:\n{texto_autos}\n\nCASO/INSTRUÇÕES:\n{fatos_do_caso}"]
         prompt.extend(conteudos_multimais)
 
         response = client.models.generate_content(
@@ -124,4 +129,4 @@ async def gerar_docx(dados: DadosPeca):
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=Estrategia_MA_Elite.docx"})
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite_Estrategia.docx"})
