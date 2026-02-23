@@ -2,7 +2,7 @@ import os
 import io
 import json
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse # Adicionado FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import PyPDF2
@@ -14,8 +14,12 @@ from google.genai import types
 
 app = FastAPI()
 
-# --- UTILITÁRIOS ---
+# --- ROTA PARA SERVIR O SITE (Corrige o Erro 404) ---
+@app.get("/")
+async def serve_index():
+    return FileResponse("index.html")
 
+# --- UTILITÁRIOS ---
 def extrair_texto_pdf(file_bytes):
     texto = ""
     try:
@@ -28,8 +32,7 @@ def extrair_texto_pdf(file_bytes):
         print(f"Erro na extração de PDF: {e}")
     return texto
 
-# --- MOTOR JURÍDICO (NÍVEL JUS IA) ---
-
+# --- MOTOR JURÍDICO ---
 @app.post("/analisar")
 async def analisar_caso(
     api_key: str = Form(...),
@@ -49,31 +52,25 @@ async def analisar_caso(
         client = genai.Client(api_key=api_key)
 
         instrucoes_sistema = f"""
-        Você é o M.A JURÍDICO, uma IA de alta performance para advogados, operando no nível de Planos Avançados de Pesquisa.
-        Sua especialidade atual é {area_direito}.
-
+        Você é o M.A JURÍDICO, nível Jus IA Experience. Especialista em {area_direito}.
+        
         MISSÃO:
-        1. ANÁLISE DE PROVAS: Identifique lacunas nos fatos narrados ou nos documentos anexados e sugira quais provas (documentais ou testemunhais) o advogado deve buscar.
-        2. PESQUISA WEB REAL: Use o Google Search para encontrar acórdãos do último ano. Não aceite alucinações.
-        3. ESTRATÉGIA DE DEFESA/ATAQUE: Crie teses subsidiárias caso a principal seja rejeitada.
-        4. PEÇA PROCESSUAL DE ELITE: Redija uma petição completa com:
-           - Endereçamento e Qualificação (use [NOME COMPLETO] para dados faltantes);
-           - Dos Fatos (narrativa lógica e persuasiva);
-           - Do Direito (subsunção do fato à norma e jurisprudência);
-           - Dos Pedidos (detalhados, incluindo valor da causa e honorários).
+        1. ANÁLISE DE PROVAS: Liste no campo 'checklist' 3 a 5 providências ou provas cruciais.
+        2. PESQUISA REAL: Use Google Search para acórdãos e súmulas reais.
+        3. PEÇA DE ELITE: Redija a petição completa com fundamentação robusta.
 
-        IMPORTANTE: Retorne APENAS um objeto JSON puro.
-        Estrutura:
+        RETORNE APENAS JSON:
         {{
-            "resumo_estrategico": "Análise técnica + Probabilidade de êxito + Sugestão de Provas faltantes",
-            "base_legal": ["Artigos comentados"],
-            "jurisprudencia": ["Ementas reais e links/referências"],
-            "doutrina": ["Citações doutrinárias de peso"],
-            "peca_processual": "Texto completo da petição"
+            "resumo_estrategico": "Análise técnica e probabilidade",
+            "checklist": ["Providência 1", "Prova 2", "..."],
+            "base_legal": ["Artigos"],
+            "jurisprudencia": ["Precedentes"],
+            "doutrina": ["Doutrinadores"],
+            "peca_processual": "Texto da petição"
         }}
         """
 
-        prompt = f"{instrucoes_sistema}\n\nDOCUMENTOS:\n{texto_documentos}\n\nRELATO DO CASO:\n{fatos_do_caso}"
+        prompt = f"{instrucoes_sistema}\n\nDOCUMENTOS:\n{texto_documentos}\n\nCASO:\n{fatos_do_caso}"
 
         response = client.models.generate_content(
             model='gemini-2.0-flash',
@@ -90,8 +87,7 @@ async def analisar_caso(
     except Exception as e:
         return JSONResponse(content={"erro": str(e)}, status_code=500)
 
-# --- GERADOR DE WORD PROFISSIONAL (PADRÃO ABNT/JURÍDICO) ---
-
+# --- GERADOR DE WORD PROFISSIONAL ---
 class DadosPeca(BaseModel):
     texto_peca: str
     advogado_nome: Optional[str] = ""
@@ -101,58 +97,25 @@ class DadosPeca(BaseModel):
 @app.post("/gerar_docx")
 async def gerar_docx(dados: DadosPeca):
     doc = docx.Document()
-    
-    # Configuração de Margens (Padrão Petição)
-    sections = doc.sections
-    for section in sections:
-        section.top_margin = Cm(3)
-        section.bottom_margin = Cm(2)
-        section.left_margin = Cm(3)
-        section.right_margin = Cm(2)
+    for s in doc.sections:
+        s.top_margin, s.bottom_margin = Cm(3), Cm(2)
+        s.left_margin, s.right_margin = Cm(3), Cm(2)
 
-    # Cabeçalho Elegante
     if dados.advogado_nome:
-        header_table = doc.add_table(rows=1, cols=1)
-        header_table.width = Cm(16)
-        cell = header_table.rows[0].cells[0]
-        
-        p = cell.paragraphs[0]
+        p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        run_name = p.add_run(dados.advogado_nome.upper())
-        run_name.bold = True
-        run_name.font.size = Pt(12)
-        run_name.font.name = 'Times New Roman'
-        
-        p_info = cell.add_paragraph()
-        p_info.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        info_text = f"OAB: {dados.advogado_oab}\n{dados.advogado_endereco}"
-        run_info = p_info.add_run(info_text)
-        run_info.font.size = Pt(8)
-        run_info.italic = True
-        run_info.font.name = 'Times New Roman'
-        
+        r = p.add_run(f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}")
+        r.font.size, r.font.name = Pt(10), 'Times New Roman'
         doc.add_paragraph("\n")
 
-    # Formatação do Texto da Peça
-    style = doc.styles['Normal']
-    style.font.name = 'Times New Roman'
-    style.font.size = Pt(12)
-    
-    paragrafos = dados.texto_peca.split('\n')
-    for p_text in paragrafos:
+    for p_text in dados.texto_peca.split('\n'):
         if p_text.strip():
             para = doc.add_paragraph(p_text.strip())
             para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             para.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
             para.paragraph_format.first_line_indent = Cm(2.0)
-            para.paragraph_format.space_after = Pt(6)
 
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    
-    return StreamingResponse(
-        buffer,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        headers={"Content-Disposition": f"attachment; filename=MA_Peca_Profissional.docx"}
-    )
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=Peca_MA_Premium.docx"})
