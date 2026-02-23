@@ -15,9 +15,14 @@ from google.genai import types
 
 app = FastAPI()
 
+# --- ROTA DE ENTRADA ---
+
 @app.get("/")
 def serve_index():
+    """Serve o ficheiro index.html na raiz do servidor"""
     return FileResponse("index.html")
+
+# --- UTILITÁRIOS DE TRATAMENTO (Importação Local para RAM) ---
 
 def comprimir_video(input_path, output_path):
     try:
@@ -41,15 +46,17 @@ def comprimir_audio(input_path, output_path):
         print(f"Erro áudio: {e}")
         return False
 
-# CORREÇÃO CRUCIAL 1: Removido o "async". Agora o FastAPI não vai "congelar" 
-# e estourar a memória quando ler PDFs gigantes.
+# --- MOTOR DE INTELIGÊNCIA JURÍDICA ELITE ---
+
+# CORREÇÃO 422: arquivos agora tem default=[] para evitar erro de validação
+# CORREÇÃO ASYNC: Removido 'async' para o servidor não congelar em uploads longos
 @app.post("/analisar")
 def analisar_caso(
     fatos_do_caso: str = Form(...),
     area_direito: str = Form(...),
-    magistrado: str = Form(None),
-    tribunal: str = Form(None),
-    arquivos: Optional[List[UploadFile]] = File(None)
+    magistrado: Optional[str] = Form(None),
+    tribunal: Optional[str] = Form(None),
+    arquivos: List[UploadFile] = File(default=[])
 ):
     temp_files_to_clean = []
     try:
@@ -67,6 +74,7 @@ def analisar_caso(
                 temp_input = f"temp_in_{int(time.time())}_{arquivo.filename}"
                 temp_files_to_clean.append(temp_input)
                 
+                # Salvamento por Streaming (Proteção de RAM)
                 with open(temp_input, "wb") as buffer:
                     shutil.copyfileobj(arquivo.file, buffer)
 
@@ -88,14 +96,14 @@ def analisar_caso(
                         target_file = temp_output
                         temp_files_to_clean.append(temp_output)
 
-                # CORREÇÃO CRUCIAL 2: Trocado 'path=' por 'file=' para a nova versão da API
+                # CORREÇÃO SDK: Uso do parâmetro 'file=' em vez de 'path='
                 gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
                 
+                # Loop de processamento seguro (Roda em thread separada pelo FastAPI)
                 while True:
                     f_info = client.files.get(name=gemini_file.name)
-                    # Adicionado proteção anti-falha do servidor Google
                     if f_info.state.name == "FAILED":
-                        raise Exception(f"A IA não conseguiu ler o arquivo {arquivo.filename}. Pode ser grande demais ou estar corrompido.")
+                        raise Exception(f"A IA falhou ao ler {arquivo.filename}. Verifique se o arquivo está corrompido.")
                     if f_info.state.name != "PROCESSING": 
                         break
                     time.sleep(2)
@@ -114,14 +122,15 @@ def analisar_caso(
         prompt_partes = [f"{instrucoes_sistema}\n\nFATOS:\n{fatos_do_caso}"]
         prompt_partes.extend(conteudos_multimais)
 
+        # Gemini 2.5 Flash para máxima estabilidade em 2026
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
             contents=prompt_partes,
             config=types.GenerateContentConfig(temperature=0.1, tools=[{"google_search": {}}])
         )
 
+        # Limpeza de Markdown (Evita Erro de Parsing JSON)
         texto_puro = response.text.strip()
-        # Tratamento extra caso a IA retorne com markdown (```json)
         if texto_puro.startswith("```json"):
             texto_puro = texto_puro.replace("```json", "", 1)
         if texto_puro.endswith("```"):
@@ -136,13 +145,14 @@ def analisar_caso(
         for f in temp_files_to_clean:
             if os.path.exists(f): os.remove(f)
 
+# --- GERADOR DE WORD PROFISSIONAL ---
+
 class DadosPeca(BaseModel):
     texto_peca: str
     advogado_nome: Optional[str] = ""
     advogado_oab: Optional[str] = ""
     advogado_endereco: Optional[str] = ""
 
-# Removido o 'async' aqui também para estabilidade
 @app.post("/gerar_docx")
 def gerar_docx(dados: DadosPeca):
     try:
@@ -150,7 +160,6 @@ def gerar_docx(dados: DadosPeca):
         for s in doc.sections:
             s.top_margin, s.bottom_margin, s.left_margin, s.right_margin = Cm(3), Cm(2), Cm(3), Cm(2)
 
-        # Proteção contra dados vazios ou nulos
         if dados.advogado_nome:
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -172,5 +181,4 @@ def gerar_docx(dados: DadosPeca):
         buffer.seek(0)
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
-        print(f"Erro ao gerar DOCX: {e}")
         return JSONResponse(content={"erro": str(e)}, status_code=500)
