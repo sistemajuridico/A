@@ -97,34 +97,34 @@
 
                 <div id="loader" class="hidden text-center py-10">
                     <div class="inline-block w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Otimizando mídias e cruzando dados de Juízo...</p>
+                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Cruzando dados, juízo e precedentes multimédias...</p>
                 </div>
 
                 <div id="results" class="hidden space-y-8 pb-20">
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div class="glass rounded-2xl p-6">
-                            <h3 class="text-xs font-black text-brand-500 uppercase mb-6"><i class="fa-solid fa-timeline mr-2"></i> Cronologia</h3>
+                            <h3 class="text-xs font-black text-brand-500 uppercase mb-6">Cronologia</h3>
                             <div id="timeline" class="ml-4 border-l border-slate-700 pl-6 space-y-6 relative text-sm"></div>
                         </div>
                         <div class="glass rounded-2xl p-6 border-t-4 border-red-500">
-                            <h3 class="text-xs font-black text-red-500 uppercase mb-6"><i class="fa-solid fa-bolt mr-2"></i> Modo Combate</h3>
+                            <h3 class="text-xs font-black text-red-500 uppercase mb-6">Modo Combate</h3>
                             <ul id="vulnerabilidades" class="space-y-3"></ul>
                         </div>
                         <div class="glass rounded-2xl p-6 border-l-4 border-l-purple-500">
-                            <h3 class="text-xs font-black text-purple-500 uppercase mb-6"><i class="fa-solid fa-chart-line mr-2"></i> Jurimetria</h3>
+                            <h3 class="text-xs font-black text-purple-500 uppercase mb-6">Jurimetria</h3>
                             <p id="jurimetria" class="text-sm text-slate-300 italic leading-relaxed"></p>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="glass rounded-2xl p-6 border-l-4 border-l-emerald-500">
-                            <h3 class="text-xs font-black text-emerald-500 uppercase mb-4"><i class="fa-solid fa-list-check mr-2"></i> Providências</h3>
+                            <h3 class="text-xs font-black text-emerald-500 uppercase mb-4">Providências Necessárias</h3>
                             <ul id="checklist" class="space-y-2"></ul>
                         </div>
                         <div class="glass rounded-2xl p-6 border-l-4 border-l-green-500">
                             <div class="flex justify-between items-start mb-4">
-                                <h3 class="text-xs font-black text-green-500 uppercase"><i class="fa-brands fa-whatsapp mr-2"></i> Report p/ Cliente</h3>
-                                <button onclick="copyWA()" class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/20">COPIAR</button>
+                                <h3 class="text-xs font-black text-green-500 uppercase">Report p/ Cliente</h3>
+                                <button onclick="copyWA()" class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/20 hover:bg-green-500 hover:text-white transition-all">COPIAR</button>
                             </div>
                             <p id="resumo_cliente" class="text-sm text-slate-300 font-sans leading-relaxed"></p>
                         </div>
@@ -171,12 +171,12 @@
         }
 
         async function processar() {
-            // O loader agora avisa sobre a otimização de mídias
+            // Loader ativado
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('results').classList.add('hidden');
 
             const fd = new FormData();
-            // Já não pegamos nem enviamos a apiKey, pois o Render já a tem.
+            // Dados enviados sem a apiKey (que agora está no servidor)
             fd.append("fatos_do_caso", document.getElementById('fatosCaso').value);
             fd.append("area_direito", document.getElementById('areaDireito').value);
             fd.append("magistrado", document.getElementById('magistrado').value);
@@ -210,7 +210,7 @@
 
                 const cl = document.getElementById('checklist'); cl.innerHTML = '';
                 (d.checklist || []).forEach(c => {
-                    cl.innerHTML += `<li class="flex items-center gap-2 text-xs text-slate-300"><i class="fa-regular fa-square-check text-emerald-500"></i> ${c}</li>`;
+                    cl.innerHTML += `<li class="flex items-center gap-2 text-xs text-slate-300 p-1"><i class="fa-regular fa-square-check text-emerald-500"></i> ${c}</li>`;
                 });
 
                 const carregarL = (lista, id, color) => {
