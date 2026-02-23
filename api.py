@@ -23,31 +23,28 @@ app = FastAPI()
 
 @app.get("/")
 async def serve_index():
-    """Serve o ficheiro index.html na raiz do servidor"""
     return FileResponse("index.html")
 
 # --- UTILITÁRIOS DE TRATAMENTO E COMPRESSÃO ---
 
 def comprimir_video(input_path, output_path):
-    """Reduz vídeo para 480p e 15fps para não estourar os 512MB de RAM do Render"""
     try:
         with VideoFileClip(input_path) as video:
             video_redimensionado = video.resize(height=480)
             video_redimensionado.write_videofile(output_path, fps=15, codec="libx264", audio_codec="aac", logger=None)
         return True
     except Exception as e:
-        print(f"Erro ao comprimir vídeo: {e}")
+        print(f"Erro vídeo: {e}")
         return False
 
 def comprimir_audio(input_path, output_path):
-    """Converte áudio para Mono e reduz qualidade para análise de IA"""
     try:
         audio = AudioSegment.from_file(input_path)
         audio = audio.set_channels(1).set_frame_rate(16000)
         audio.export(output_path, format="mp3", bitrate="64k")
         return True
     except Exception as e:
-        print(f"Erro ao comprimir áudio: {e}")
+        print(f"Erro áudio: {e}")
         return False
 
 # --- MOTOR DE INTELIGÊNCIA JURÍDICA ELITE ---
@@ -60,119 +57,89 @@ async def analisar_caso(
     tribunal: str = Form(None),
     arquivos: List[UploadFile] = None
 ):
+    temp_files_to_clean = []
     try:
-        # CAPTURA AUTOMÁTICA DA CHAVE DO RENDER
         api_key = os.getenv("GEMINI_API_KEY")
-        
         if not api_key:
-            print("--- ERRO CRÍTICO ---: Variável GEMINI_API_KEY não encontrada no Render.")
-            return JSONResponse(content={"erro": "Chave API não configurada no servidor Render."}, status_code=500)
+            return JSONResponse(content={"erro": "Chave API não configurada."}, status_code=500)
 
         client = genai.Client(api_key=api_key)
         conteudos_multimais = []
 
         if arquivos:
             for arquivo in arquivos:
+                if not arquivo.filename: continue
                 ext = arquivo.filename.lower().split('.')[-1]
-                temp_input = f"temp_in_{arquivo.filename}"
+                temp_input = f"temp_in_{int(time.time())}_{arquivo.filename}"
+                temp_files_to_clean.append(temp_input)
                 
                 # SALVAMENTO EM DISCO (STREAMING)
-                # Evita carregar o arquivo na RAM, resolvendo o problema de PDFs grandes no Render
                 with open(temp_input, "wb") as buffer:
                     shutil.copyfileobj(arquivo.file, buffer)
 
-                try:
-                    target_file = temp_input
+                target_file = temp_input
+                mime = "application/pdf"
+                
+                if ext == "pdf":
                     mime = "application/pdf"
-                    
-                    if ext == "pdf":
-                        mime = "application/pdf"
-                        print(f"Enviando PDF {arquivo.filename} nativamente para o Gemini...")
-                        
-                    elif ext in ["mp4", "mpeg", "mov", "avi"]:
-                        mime = "video/mp4"
-                        temp_output = f"comp_{arquivo.filename}"
-                        if comprimir_video(temp_input, temp_output):
-                            target_file = temp_output
+                elif ext in ["mp4", "mpeg", "mov", "avi"]:
+                    mime = "video/mp4"
+                    temp_output = f"comp_{int(time.time())}_{arquivo.filename}"
+                    if comprimir_video(temp_input, temp_output):
+                        target_file = temp_output
+                        temp_files_to_clean.append(temp_output)
+                elif ext in ["mp3", "wav", "m4a", "ogg"]:
+                    mime = "audio/mp3"
+                    temp_output = f"comp_{int(time.time())}_{arquivo.filename}"
+                    if comprimir_audio(temp_input, temp_output):
+                        target_file = temp_output
+                        temp_files_to_clean.append(temp_output)
 
-                    elif ext in ["mp3", "wav", "m4a", "ogg"]:
-                        mime = "audio/mp3"
-                        temp_output = f"comp_{arquivo.filename}"
-                        if comprimir_audio(temp_input, temp_output):
-                            target_file = temp_output
+                # UPLOAD PARA GOOGLE CLOUD (OCR AUTOMÁTICO)
+                gemini_file = client.files.upload(path=target_file, config={'mime_type': mime})
+                
+                while gemini_file.state.name == "PROCESSING":
+                    time.sleep(2)
+                    gemini_file = client.files.get(name=gemini_file.name)
 
-                    # UPLOAD DIRETO PARA A GOOGLE CLOUD (Suporta PDFs gigantes e escaneados)
-                    gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
-                    
-                    # Para vídeos e PDFs gigantes, o Gemini pode pedir 1 ou 2 segundos de processamento
-                    if gemini_file.state.name == "PROCESSING":
-                        print("Aguardando processamento do ficheiro na nuvem...")
-                        while True:
-                            file_info = client.files.get(name=gemini_file.name)
-                            if file_info.state.name != "PROCESSING":
-                                break
-                            time.sleep(2)
-
-                    conteudos_multimais.append(gemini_file)
-
-                except Exception as ex:
-                    print(f"Erro ao processar ficheiro {arquivo.filename}: {ex}")
-
-                finally:
-                    # Limpeza para não encher o disco do Render
-                    if os.path.exists(temp_input): os.remove(temp_input)
-                    if 'temp_output' in locals() and os.path.exists(temp_output): os.remove(temp_output)
-
+                conteudos_multimais.append(gemini_file)
 
         instrucoes_sistema = f"""
-        Você é o M.A | JUS IA EXPERIENCE, a inteligência jurídica de elite no Brasil. 
-        Sua especialidade agora é {area_direito}.
-        
-        MISSÃO ESTRATÉGICA:
-        1. JURIMETRIA: Pesquise no Google Search por decisões do magistrado '{magistrado}' no '{tribunal}'. Identifique padrões de julgamento.
-        2. LINHA DO TEMPO: Crie uma cronologia rigorosa a partir dos autos anexos. Aponte alertas de prescrição.
-        3. MODO COMBATE: Analise documentos da contraparte e identifique furos na narrativa.
-        4. TRADUÇÃO CLIENTE: Crie um resumo para WhatsApp explicativo e sem juridiquês.
-        5. VISUAL LAW: Petição moderna, persuasiva e escaneável.
-
+        Você é o M.A | JUS IA EXPERIENCE. Especialidade: {area_direito}.
+        Use Google Search para o magistrado '{magistrado}' no '{tribunal}'.
         RETORNE ESTRITAMENTE EM JSON:
         {{
-            "resumo_estrategico": "Análise técnica",
-            "jurimetria": "Tendências do juízo",
-            "resumo_cliente": "Texto para WhatsApp",
-            "timeline": [{{ "data": "DD/MM/AAAA", "evento": "descrição", "alerta": "opcional" }}],
-            "vulnerabilidades_contraparte": ["Ponto 1", "..."],
-            "checklist": ["Providência 1", "..."],
-            "base_legal": ["Artigos"],
-            "jurisprudencia": ["Ementas reais"],
-            "doutrina": ["Autores"],
-            "peca_processual": "Texto da petição"
+            "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
+            "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
+            "base_legal": [], "jurisprudencia": [], "doutrina": [], "peca_processual": "..."
         }}
         """
 
-        prompt_partes = [
-            f"{instrucoes_sistema}\n\nFATOS DO CASO:\n{fatos_do_caso}\n\nINSTRUÇÃO: Analise cuidadosamente TODOS os documentos, mídias e autos que foram anexados a esta requisição."
-        ]
+        prompt_partes = [f"{instrucoes_sistema}\n\nFATOS: {fatos_do_caso}"]
         prompt_partes.extend(conteudos_multimais)
 
+        # AJUSTE: MOTOR 2.5 E REMOÇÃO DO CONFLITO DE JSON
         response = client.models.generate_content(
-            model='gemini-2.0-flash', 
+            model='gemini-2.5-flash', 
             contents=prompt_partes,
             config=types.GenerateContentConfig(
-                response_mime_type="application/json",
                 temperature=0.1,
                 tools=[{"google_search": {}}]
             )
         )
 
-        return JSONResponse(content=json.loads(response.text))
+        # LIMPEZA DE JSON MANUAL (EVITA ERRO DE COLUNA 1)
+        texto_limpo = response.text.strip().replace("```json", "").replace("```", "").strip()
+        return JSONResponse(content=json.loads(texto_limpo))
 
     except Exception as e:
-        print(f"--- ERRO DETECTADO NO M.A ---: {str(e)}")
+        print(f"--- ERRO M.A ---: {str(e)}")
         return JSONResponse(content={"erro": str(e)}, status_code=500)
+    finally:
+        for f in temp_files_to_clean:
+            if os.path.exists(f): os.remove(f)
 
-
-# --- GERADOR DE WORD PROFISSIONAL ---
+# --- GERADOR DE WORD ---
 
 class DadosPeca(BaseModel):
     texto_peca: str
@@ -190,11 +157,9 @@ async def gerar_docx(dados: DadosPeca):
     if dados.advogado_nome:
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        header_text = f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}"
-        run_h = p.add_run(header_text)
-        run_h.font.size, run_h.font.name = Pt(10), 'Times New Roman'
-        run_h.italic = True
-        doc.add_paragraph("\n")
+        header = f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}"
+        run = p.add_run(header)
+        run.font.size, run.font.name, run.italic = Pt(10), 'Times New Roman', True
 
     for linha in dados.texto_peca.split('\n'):
         if linha.strip():
@@ -206,4 +171,4 @@ async def gerar_docx(dados: DadosPeca):
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite_Estrategia.docx"})
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
