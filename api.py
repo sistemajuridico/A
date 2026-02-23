@@ -90,11 +90,13 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         for target_file, mime in arquivos_para_gemini:
             gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
+            # A CORREÇÃO DE OURO: Obrigar a esperar pelo estado 'ACTIVE' do ficheiro
             while True:
                 f_info = client.files.get(name=gemini_file.name)
-                if f_info.state.name == "FAILED":
-                    raise Exception("A IA falhou ao ler um dos arquivos. Pode estar corrompido.")
-                if f_info.state.name != "PROCESSING": 
+                state_str = str(f_info.state).upper()
+                if "FAILED" in state_str:
+                    raise Exception("A IA falhou ao processar o ficheiro nos servidores da Google.")
+                if "ACTIVE" in state_str:
                     break
                 time.sleep(3)
             conteudos_multimais.append(f_info)
@@ -119,15 +121,22 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         prompt_partes = [f"{instrucoes}\n\nFATOS:\n{fatos}"]
         prompt_partes.extend(conteudos_multimais)
 
-        # --- A SOLUÇÃO MÁGICA: Configuração Dinâmica ---
-        # A API da Google não aceita 'google_search' se houver ficheiros enviados juntos.
+        # CONFIGURAÇÃO INTELIGENTE: Bloqueio de JSON e Versão Oficial do Motor
         if len(conteudos_multimais) > 0:
-            config_ia = types.GenerateContentConfig(temperature=0.1)
+            config_ia = types.GenerateContentConfig(
+                temperature=0.1, 
+                response_mime_type="application/json"
+            )
         else:
-            config_ia = types.GenerateContentConfig(temperature=0.1, tools=[{"google_search": {}}])
+            config_ia = types.GenerateContentConfig(
+                temperature=0.1, 
+                response_mime_type="application/json",
+                tools=[{"google_search": {}}]
+            )
 
+        # Motor atualizado para gemini-2.0-flash (Oficial e Estável)
         response = client.models.generate_content(
-            model='gemini-2.5-flash', 
+            model='gemini-2.0-flash', 
             contents=prompt_partes,
             config=config_ia
         )
