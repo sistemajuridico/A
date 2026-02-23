@@ -1,65 +1,26 @@
 import os
 import io
 import json
+import time
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
 from typing import List, Optional
-import PyPDF2
 import docx
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
-# Bibliotecas para processamento multimédia
-from moviepy.editor import VideoFileClip
-from pydub import AudioSegment
-
 app = FastAPI()
 
-# --- ROTAS DE NAVEGAÇÃO ---
+# --- INTERFACE ---
 
 @app.get("/")
 async def serve_index():
-    """Serve a interface principal do M.A"""
     return FileResponse("index.html")
 
-# --- FERRAMENTAS DE TRATAMENTO ---
-
-def extrair_texto_pdf(file_bytes):
-    texto = ""
-    try:
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
-        for page in pdf_reader.pages:
-            extraido = page.extract_text()
-            if extraido:
-                texto += extraido + "\n"
-    except Exception as e:
-        print(f"Erro PDF: {e}")
-    return texto
-
-def comprimir_video(input_path, output_path):
-    try:
-        with VideoFileClip(input_path) as video:
-            video_redimensionado = video.resize(height=480)
-            video_redimensionado.write_videofile(output_path, fps=15, codec="libx264", audio_codec="aac", logger=None)
-        return True
-    except Exception as e:
-        print(f"Erro Vídeo: {e}")
-        return False
-
-def comprimir_audio(input_path, output_path):
-    try:
-        audio = AudioSegment.from_file(input_path)
-        audio = audio.set_channels(1).set_frame_rate(16000)
-        audio.export(output_path, format="mp3", bitrate="64k")
-        return True
-    except Exception as e:
-        print(f"Erro Áudio: {e}")
-        return False
-
-# --- NÚCLEO DE INTELIGÊNCIA JURÍDICA (ESTRATEGISTA DE ELITE) ---
+# --- MOTOR DE INTELIGÊNCIA JURÍDICA (ESTRATÉGIA DE ELITE) ---
 
 @app.post("/analisar")
 async def analisar_caso(
@@ -69,47 +30,49 @@ async def analisar_caso(
     tribunal: str = Form(None),
     arquivos: List[UploadFile] = None
 ):
+    temp_files = [] # Para limpeza posterior
     try:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            return JSONResponse(content={"erro": "Chave API não configurada no Render."}, status_code=500)
-
-        conteudos_multimais = []
-        texto_autos = ""
-
-        if arquivos:
-            for arquivo in arquivos:
-                ext = arquivo.filename.lower().split('.')[-1]
-                corpo = await arquivo.read()
-                temp_in, temp_out = f"in_{arquivo.filename}", f"proc_{arquivo.filename}"
-                with open(temp_in, "wb") as f: f.write(corpo)
-
-                if ext == "pdf":
-                    texto_autos += f"\n[DOC: {arquivo.filename}]\n{extrair_texto_pdf(corpo)}"
-                elif ext in ["mp4", "mov", "avi"]:
-                    if comprimir_video(temp_in, temp_out):
-                        with open(temp_out, "rb") as f:
-                            conteudos_multimais.append(types.Part.from_bytes(data=f.read(), mime_type="video/mp4"))
-                elif ext in ["mp3", "wav", "m4a"]:
-                    if comprimir_audio(temp_in, temp_out):
-                        with open(temp_out, "rb") as f:
-                            conteudos_multimais.append(types.Part.from_bytes(data=f.read(), mime_type="audio/mp3"))
-
-                for f_temp in [temp_in, temp_out]:
-                    if os.path.exists(f_temp): os.remove(f_temp)
+            return JSONResponse(content={"erro": "Chave API não configurada."}, status_code=500)
 
         client = genai.Client(api_key=api_key)
+        conteudos_para_ia = []
 
-        # DIAGNÓSTICO DE MODELOS
-        print("--- [DIAGNÓSTICO] MODELOS DISPONÍVEIS ---")
-        try:
-            for m in client.models.list(): print(f"Disponível: {m.name}")
-        except: pass
+        # 1. PROCESSAMENTO DE ARQUIVOS (ESTRATÉGIA DE BAIXO CONSUMO DE RAM)
+        if arquivos:
+            for arquivo in arquivos:
+                if arquivo.filename == "": continue
+                
+                # Salva temporariamente no disco para não estourar a RAM do Render
+                path_temp = f"upload_{int(time.time())}_{arquivo.filename}"
+                with open(path_temp, "wb") as f:
+                    content = await arquivo.read()
+                    f.write(content)
+                temp_files.append(path_temp)
 
+                # UPLOAD DIRETO PARA O GOOGLE (O Google lê o PDF pesado para você)
+                # Isso evita o erro de "Shutting down" por falta de memória
+                file_upload = client.files.upload(path=path_temp)
+                
+                # Aguarda o processamento do arquivo (necessário para vídeos/áudios)
+                while file_upload.state.name == "PROCESSING":
+                    time.sleep(2)
+                    file_upload = client.files.get(name=file_upload.name)
+                
+                conteudos_para_ia.append(file_upload)
+
+        # 2. INSTRUÇÕES DO SISTEMA
         instrucoes = f"""
-        Você é o M.A | JUS IA EXPERIENCE. Especialidade: {area_direito}.
-        Use Google Search para o magistrado '{magistrado}' no '{tribunal}'.
-        RETORNE ESTRITAMENTE EM JSON, sem textos explicativos antes ou depois:
+        Você é o M.A | JUS IA EXPERIENCE, a inteligência jurídica de elite.
+        ÁREA: {area_direito}. JUIZ: {magistrado}. TRIBUNAL: {tribunal}.
+        
+        MISSÃO:
+        - Use Google Search para pesquisar precedentes reais e o perfil do magistrado.
+        - Analise os documentos anexados com rigor técnico.
+        - Gere uma petição moderna (Visual Law) e um resumo para o cliente.
+        
+        RETORNE ESTRITAMENTE EM JSON:
         {{
             "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
             "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
@@ -117,20 +80,20 @@ async def analisar_caso(
         }}
         """
 
-        prompt_final = [f"{instrucoes}\n\nAUTOS:\n{texto_autos}\n\nFATOS:\n{fatos_do_caso}"]
-        prompt_final.extend(conteudos_multimais)
+        conteudos_para_ia.append(f"{instrucoes}\n\nFATOS DO CASO: {fatos_do_caso}")
 
-        # CONFIGURAÇÃO SEM CONFLITO (REMOVEU-SE O RESPONSE_MIME_TYPE)
+        # 3. CHAMADA DA IA COM BUSCA ATIVA
+        # Usamos o modelo 2.5 Flash, que é o padrão reconhecido para sua conta paga
         response = client.models.generate_content(
-            model='gemini-2.5-flash', 
-            contents=prompt_final,
+            model='gemini-2.5-flash',
+            contents=conteudos_para_ia,
             config=types.GenerateContentConfig(
                 temperature=0.1,
                 tools=[{"google_search": {}}]
             )
         )
 
-        # --- LIMPEZA DE JSON (CORRIGE O ERRO DE COLUNA 1) ---
+        # 4. LIMPEZA E TRATAMENTO DO JSON
         texto_limpo = response.text.strip()
         if texto_limpo.startswith("```json"):
             texto_limpo = texto_limpo.replace("```json", "", 1)
@@ -142,6 +105,11 @@ async def analisar_caso(
     except Exception as e:
         print(f"--- ERRO CRÍTICO NO M.A ---: {str(e)}")
         return JSONResponse(content={"erro": str(e)}, status_code=500)
+    
+    finally:
+        # Limpa os arquivos temporários do servidor Render
+        for f in temp_files:
+            if os.path.exists(f): os.remove(f)
 
 # --- GERADOR DE DOCX ---
 
@@ -155,7 +123,8 @@ class DadosPeca(BaseModel):
 async def gerar_docx(dados: DadosPeca):
     doc = docx.Document()
     for s in doc.sections:
-        s.top_margin, s.bottom_margin, s.left_margin, s.right_margin = Cm(3), Cm(2), Cm(3), Cm(2)
+        s.top_margin, s.bottom_margin = Cm(3), Cm(2)
+        s.left_margin, s.right_margin = Cm(3), Cm(2)
 
     if dados.advogado_nome:
         p = doc.add_paragraph()
