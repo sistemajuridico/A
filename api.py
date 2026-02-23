@@ -137,8 +137,9 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 tools=[{"googleSearch": {}}]  # Sintaxe estrita exigida pela SDK 0.2.0
             )
 
+       # O Motor da Nova Geração (Ativo, Rápido e Sem Limites para Contas Pagas)
         response = client.models.generate_content(
-            model='gemini-1.5-flash', 
+            model='gemini-2.5-flash', 
             contents=prompt_partes,
             config=config_ia
         )
@@ -241,3 +242,4 @@ def gerar_docx(dados: DadosPeca):
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
         return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
+
