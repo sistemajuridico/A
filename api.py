@@ -130,23 +130,32 @@ class DadosPeca(BaseModel):
 
 @app.post("/gerar_docx")
 async def gerar_docx(dados: DadosPeca):
-    doc = docx.Document()
-    for s in doc.sections:
-        s.top_margin, s.bottom_margin, s.left_margin, s.right_margin = Cm(3), Cm(2), Cm(3), Cm(2)
+    try:
+        doc = docx.Document()
+        for s in doc.sections:
+            s.top_margin, s.bottom_margin, s.left_margin, s.right_margin = Cm(3), Cm(2), Cm(3), Cm(2)
 
-    if dados.advogado_nome:
-        p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        run_h = p.add_run(f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}")
-        run_h.font.size, run_h.font.name, run_h.italic = Pt(10), 'Times New Roman', True
+        # Proteção contra dados vazios ou nulos
+        if dados.advogado_nome:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            nome = str(dados.advogado_nome).upper()
+            oab = str(dados.advogado_oab) if dados.advogado_oab else "---"
+            end = str(dados.advogado_endereco) if dados.advogado_endereco else ""
+            run_h = p.add_run(f"{nome}\nOAB: {oab}\n{end}")
+            run_h.font.size, run_h.font.name, run_h.italic = Pt(10), 'Times New Roman', True
 
-    for linha in dados.texto_peca.split('\n'):
-        if linha.strip():
-            para = doc.add_paragraph(linha.strip())
-            para.alignment, para.paragraph_format.line_spacing_rule = WD_ALIGN_PARAGRAPH.JUSTIFY, WD_LINE_SPACING.ONE_POINT_FIVE
-            para.paragraph_format.first_line_indent = Cm(2.0)
+        for linha in dados.texto_peca.split('\n'):
+            if linha.strip():
+                para = doc.add_paragraph(linha.strip())
+                para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                para.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+                para.paragraph_format.first_line_indent = Cm(2.0)
 
-    buffer = io.BytesIO()
-    doc.save(buffer)
-    buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
+    except Exception as e:
+        print(f"Erro ao gerar DOCX: {e}")
+        return JSONResponse(content={"erro": str(e)}, status_code=500)
