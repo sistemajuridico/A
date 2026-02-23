@@ -90,7 +90,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         for target_file, mime in arquivos_para_gemini:
             gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
-            # A CORREÇÃO DE OURO: Obrigar a esperar pelo estado 'ACTIVE' do ficheiro
+            # Esperar pelo estado 'ACTIVE' para a IA não rejeitar o ficheiro
             while True:
                 f_info = client.files.get(name=gemini_file.name)
                 state_str = str(f_info.state).upper()
@@ -121,7 +121,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         prompt_partes = [f"{instrucoes}\n\nFATOS:\n{fatos}"]
         prompt_partes.extend(conteudos_multimais)
 
-        # CONFIGURAÇÃO INTELIGENTE: Bloqueio de JSON e Versão Oficial do Motor
         if len(conteudos_multimais) > 0:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
@@ -134,9 +133,9 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 tools=[{"google_search": {}}]
             )
 
-       # Motor atualizado
+        # A CORREÇÃO FINAL: O modelo oficial de altíssima capacidade
         response = client.models.generate_content(
-            model='gemini-2.5-flash', 
+            model='gemini-1.5-pro', 
             contents=prompt_partes,
             config=config_ia
         )
@@ -239,4 +238,3 @@ def gerar_docx(dados: DadosPeca):
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
         return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
-
