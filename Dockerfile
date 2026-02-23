@@ -1,21 +1,26 @@
-# Usar uma imagem oficial do Python
+# Utiliza a imagem oficial do Python 3.10 slim para manter o container leve
 FROM python:3.10-slim
 
-# Instalar o FFmpeg e dependências do sistema
+# Instalação de dependências do sistema:
+# - ffmpeg: necessário para o processamento de áudio e vídeo via moviepy/pydub
+# - libmagic-dev: para identificação de tipos de ficheiro
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libmagic-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Definir o diretório de trabalho
+# Define o diretório de trabalho dentro do container
 WORKDIR /app
 
-# Copiar os requisitos e instalar
+# Copia o ficheiro de dependências e instala as bibliotecas
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar o resto do código
+# Copia todo o código fonte para dentro do container
 COPY . .
 
-# Comando para iniciar o servidor
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "10000", "--timeout-keep-alive", "120"]
+# COMANDO DE INICIALIZAÇÃO DE ALTA DISPONIBILIDADE
+# -w 1: Limita a 1 worker para economizar os 512MB de RAM do Render
+# --timeout 600: Dá 10 minutos para que PDFs grandes terminem o upload e processamento
+# -k uvicorn.workers.UvicornWorker: Integra o Gunicorn com o FastAPI de forma estável
+CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "api:app", "--bind", "0.0.0.0:10000", "--timeout", "600"]
