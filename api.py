@@ -22,7 +22,7 @@ def serve_index():
     """Serve o ficheiro index.html na raiz do servidor"""
     return FileResponse("index.html")
 
-# --- UTILITÁRIOS DE TRATAMENTO (Importação Local para RAM) ---
+# --- UTILITÁRIOS DE TRATAMENTO ---
 
 def comprimir_video(input_path, output_path):
     try:
@@ -48,16 +48,19 @@ def comprimir_audio(input_path, output_path):
 
 # --- MOTOR DE INTELIGÊNCIA JURÍDICA ELITE ---
 
-# CORREÇÃO 422: arquivos agora tem default=[] para evitar erro de validação
-# CORREÇÃO ASYNC: Removido 'async' para o servidor não congelar em uploads longos
+# BLINDAGEM ANTI-422: Todos os campos agora possuem valores padrão (default)
 @app.post("/analisar")
 def analisar_caso(
-    fatos_do_caso: str = Form(...),
-    area_direito: str = Form(...),
-    magistrado: Optional[str] = Form(None),
-    tribunal: Optional[str] = Form(None),
-    arquivos: List[UploadFile] = File(default=[])
+    fatos_do_caso: str = Form(default=""),
+    area_direito: str = Form(default=""),
+    magistrado: str = Form(default=""),
+    tribunal: str = Form(default=""),
+    arquivos: Optional[List[UploadFile]] = File(default=None)
 ):
+    # Validação manual para evitar o 422
+    if not fatos_do_caso or len(fatos_do_caso.strip()) < 5:
+        return JSONResponse(content={"erro": "Por favor, descreva os fatos do caso."}, status_code=400)
+
     temp_files_to_clean = []
     try:
         api_key = os.getenv("GEMINI_API_KEY")
@@ -69,12 +72,15 @@ def analisar_caso(
 
         if arquivos:
             for arquivo in arquivos:
-                if not arquivo.filename: continue
+                # Se o frontend enviar um campo vazio, ignoramos
+                if not arquivo.filename: 
+                    continue
+                    
                 ext = arquivo.filename.lower().split('.')[-1]
                 temp_input = f"temp_in_{int(time.time())}_{arquivo.filename}"
                 temp_files_to_clean.append(temp_input)
                 
-                # Salvamento por Streaming (Proteção de RAM)
+                # Salvamento por Streaming
                 with open(temp_input, "wb") as buffer:
                     shutil.copyfileobj(arquivo.file, buffer)
 
@@ -96,10 +102,10 @@ def analisar_caso(
                         target_file = temp_output
                         temp_files_to_clean.append(temp_output)
 
-                # CORREÇÃO SDK: Uso do parâmetro 'file=' em vez de 'path='
+                # Uso do parâmetro 'file=' exigido pela SDK 0.2.0
                 gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
                 
-                # Loop de processamento seguro (Roda em thread separada pelo FastAPI)
+                # O Time.sleep agora roda seguro numa thread separada pelo FastAPI
                 while True:
                     f_info = client.files.get(name=gemini_file.name)
                     if f_info.state.name == "FAILED":
@@ -122,14 +128,14 @@ def analisar_caso(
         prompt_partes = [f"{instrucoes_sistema}\n\nFATOS:\n{fatos_do_caso}"]
         prompt_partes.extend(conteudos_multimais)
 
-        # Gemini 2.5 Flash para máxima estabilidade em 2026
+        # Gemini 2.5 Flash para máxima estabilidade
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
             contents=prompt_partes,
             config=types.GenerateContentConfig(temperature=0.1, tools=[{"google_search": {}}])
         )
 
-        # Limpeza de Markdown (Evita Erro de Parsing JSON)
+        # Limpeza de Markdown
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
             texto_puro = texto_puro.replace("```json", "", 1)
