@@ -199,7 +199,7 @@
             loader.classList.remove('hidden');
             results.classList.add('hidden');
             btn.disabled = true;
-            analiseGlobal = null; // Reseta a análise anterior
+            analiseGlobal = null; 
 
             const fd = new FormData();
             fd.append("fatos_do_caso", fatos);
@@ -266,7 +266,6 @@
             alert("Texto copiado!"); 
         }
 
-        // Função Antiga (Baixa só a Petição)
         async function baixarDoc() {
             const payload = {
                 texto_peca: document.getElementById('peca').value,
@@ -277,7 +276,6 @@
             enviarParaServidorWord(payload, "MA_Minuta_Peticional.docx");
         }
 
-        // NOVA FUNÇÃO: Gera o Dossiê Completo juntando todas as partes
         async function baixarDossieCompleto() {
             if (!analiseGlobal) return;
 
@@ -323,6 +321,17 @@
                 textoCompleto += "\n";
             }
 
+            if(analiseGlobal.doutrina && analiseGlobal.doutrina.length > 0) {
+                textoCompleto += "=== REFERÊNCIAS DOUTRINÁRIAS ===\n";
+                analiseGlobal.doutrina.forEach(d => { textoCompleto += `- ${d}\n`; });
+                textoCompleto += "\n";
+            }
+
+            if(analiseGlobal.peca_processual) {
+                textoCompleto += "=== MINUTA DA PEÇA PROCESSUAL ===\n";
+                textoCompleto += analiseGlobal.peca_processual + "\n\n";
+            }
+
             const payload = {
                 texto_peca: textoCompleto,
                 advogado_nome: document.getElementById('advNome').value,
@@ -333,7 +342,6 @@
             enviarParaServidorWord(payload, "MA_Dossie_Estrategico_Completo.docx");
         }
 
-        // Função utilitária para chamar o Python
         async function enviarParaServidorWord(payload, nomeArquivo) {
             try {
                 const res = await fetch('/gerar_docx', {
