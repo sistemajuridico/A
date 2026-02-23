@@ -103,26 +103,32 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
+        # O Puxão de Orelhas: Regras estritas para não transcrever o processo e não quebrar o JSON
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
-        Concentre-se na análise técnica, doutrinária e jurisprudencial.
         
-        ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
-        Você DEVE redigir a PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
-        Inclua obrigatoriamente: Endereçamento correto, Qualificação completa, Dos Fatos, Do Direito, Dos Pedidos e Fecho formal.
-
-        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
+        REGRA DE OURO 1: É ESTRITAMENTE PROIBIDO transcrever, copiar ou citar longos trechos dos documentos originais. Use-os apenas como base de leitura.
+        REGRA DE OURO 2: Seja extremamente objetivo nos painéis de resumo para poupar memória.
+        REGRA DE OURO 3: O seu maior esforço deve ir EXCLUSIVAMENTE para a 'peca_processual'. Ela deve ser completa, inédita e pronta para protocolo.
+        
+        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA EXATA:
         {{
-            "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
-            "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
-            "base_legal": [], "jurisprudencia": [], "doutrina": [], 
-            "peca_processual": "TEXTO INTEGRAL E EXTENSO DA PEÇA AQUI..."
+            "resumo_estrategico": "Resumo direto. Máximo 10 linhas.",
+            "jurimetria": "Análise direta. Máximo 5 linhas.",
+            "resumo_cliente": "Explicação simples e leiga. Máximo 5 linhas.",
+            "timeline": [{{"data": "DD/MM/AAAA", "evento": "Descrição curta"}}],
+            "vulnerabilidades_contraparte": ["Furo 1", "Furo 2"],
+            "checklist": ["Ação 1", "Ação 2"],
+            "base_legal": ["Artigo X", "Súmula Y"],
+            "jurisprudencia": ["Julgado 1", "Julgado 2"],
+            "doutrina": ["Autor 1", "Autor 2"],
+            "peca_processual": "TEXTO INTEGRAL DA NOVA PEÇA. Use \\n para quebras de linha."
         }}
         """
         
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
-        prompt_partes.append(f"{instrucoes}\n\nFATOS:\n{fatos}")
+        prompt_partes.append(f"{instrucoes}\n\nFATOS NOVOS DO CLIENTE:\n{fatos}")
 
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
@@ -134,7 +140,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if len(conteudos_multimais) > 0:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1,
-                max_output_tokens=8192, # O pulmão máximo da IA para evitar cortes
+                max_output_tokens=8192,
                 response_mime_type="application/json",
                 safety_settings=filtros_seguranca
             )
@@ -165,22 +171,20 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if texto_puro.endswith("```"):
             texto_puro = texto_puro.rsplit("```", 1)[0]
             
-        # --- A REDE DE SEGURANÇA (PLANO B) ---
         try:
             resultado_final = json.loads(texto_puro.strip())
         except Exception as erro_json:
-            # Se a IA escorregar nas aspas, nós apanhamos o texto à força!
             resultado_final = {
-                "resumo_estrategico": "A IA gerou um texto tão colossal que quebrou a formatação dos painéis, mas a peça processual foi recuperada com sucesso! Veja abaixo.",
-                "jurimetria": "Formatação corrompida.",
-                "resumo_cliente": "Formatação corrompida.",
-                "timeline": [{"data": "HOJE", "evento": "Análise Bruta Concluída"}],
-                "vulnerabilidades_contraparte": ["Recuperação de texto bruto ativada."],
+                "resumo_estrategico": "A IA tentou escrever um texto colossal e quebrou o alinhamento visual, mas a peça processual e a análise bruta foram capturadas! Role a página até ao fundo.",
+                "jurimetria": "Análise contida no texto bruto.",
+                "resumo_cliente": "Texto bruto recuperado.",
+                "timeline": [{"data": "HOJE", "evento": "Recuperação de Emergência Ativada"}],
+                "vulnerabilidades_contraparte": ["Consulte a caixa de texto abaixo."],
                 "checklist": [],
                 "base_legal": [],
                 "jurisprudencia": [],
                 "doutrina": [],
-                "peca_processual": texto_puro.strip() # O texto gigante entra aqui intacto!
+                "peca_processual": texto_puro.strip()
             }
             
         TASKS[task_id] = {"status": "done", "resultado": resultado_final}
