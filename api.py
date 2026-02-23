@@ -145,9 +145,9 @@ async def analisar_caso(
         prompt_partes = [f"{instrucoes_sistema}\n\nAUTOS:\n{texto_autos}\n\nFATOS:\n{fatos_do_caso}"]
         prompt_partes.extend(conteudos_multimais)
 
-       # MODELO ESTÁVEL PARA 2026 (EVITA O ERRO 404 DE MODELO APOSENTADO)
+       # USANDO O 1.5 PRO (O MODELO MAIS ESTÁVEL E POTENTE PARA CONTAS PAGAS)
         response = client.models.generate_content(
-            model='gemini-1.5-flash', 
+            model='gemini-1.5-pro', # Mude para este nome exato
             contents=prompt_partes,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
