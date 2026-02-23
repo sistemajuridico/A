@@ -100,7 +100,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 time.sleep(3)
             conteudos_multimais.append(f_info)
 
-        # DIAGNÓSTICO APLICADO: As instruções agora são tratadas isoladamente do conteúdo
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         Concentre-se na análise técnica, doutrinária e jurisprudencial.
@@ -118,11 +117,10 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         }}
         """
         
-        # O prompt_partes agora contém APENAS os dados e ficheiros, sem instruções de sistema misturadas
         prompt_partes = [f"FATOS:\n{fatos}"]
         prompt_partes.extend(conteudos_multimais)
 
-        # DIAGNÓSTICO APLICADO: system_instruction e sintaxe da tool corrigidos
+        # A CORREÇÃO DE OURO: Utilizando o objeto oficial 'types.Tool'
         if len(conteudos_multimais) > 0:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
@@ -130,14 +128,15 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 system_instruction=instrucoes
             )
         else:
+            pesquisa_tool = types.Tool(google_search=types.GoogleSearch())
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
                 response_mime_type="application/json",
                 system_instruction=instrucoes,
-                tools=[{"googleSearch": {}}]  # Sintaxe estrita exigida pela SDK 0.2.0
+                tools=[pesquisa_tool]
             )
 
-       # O Motor da Nova Geração (Ativo, Rápido e Sem Limites para Contas Pagas)
+        # O motor definitivo e correto
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
             contents=prompt_partes,
@@ -242,4 +241,3 @@ def gerar_docx(dados: DadosPeca):
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
         return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
-
