@@ -12,23 +12,23 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
-# Bibliotecas de compressão para otimizar o Render Free
+# Bibliotecas para processamento multimédia
 from moviepy.editor import VideoFileClip
 from pydub import AudioSegment
 
 app = FastAPI()
 
-# --- ROTA DE ENTRADA ---
+# --- ROTAS DE NAVEGAÇÃO ---
 
 @app.get("/")
 async def serve_index():
-    """Serve o ficheiro index.html na raiz do servidor"""
+    """Serve a interface principal do M.A"""
     return FileResponse("index.html")
 
-# --- UTILITÁRIOS DE TRATAMENTO E COMPRESSÃO ---
+# --- FERRAMENTAS DE COMPRESSÃO (Otimizadas para Render Free) ---
 
 def extrair_texto_pdf(file_bytes):
-    """Extrai texto de PDFs anexados"""
+    """Extrai texto de documentos PDF"""
     texto = ""
     try:
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
@@ -37,32 +37,32 @@ def extrair_texto_pdf(file_bytes):
             if extraido:
                 texto += extraido + "\n"
     except Exception as e:
-        print(f"Erro na extração de PDF: {e}")
+        print(f"Erro PDF: {e}")
     return texto
 
 def comprimir_video(input_path, output_path):
-    """Reduz vídeo para 480p e 15fps para não estourar os 512MB de RAM do Render"""
+    """Reduz vídeo para caber nos 512MB de RAM do Render"""
     try:
         with VideoFileClip(input_path) as video:
             video_redimensionado = video.resize(height=480)
             video_redimensionado.write_videofile(output_path, fps=15, codec="libx264", audio_codec="aac", logger=None)
         return True
     except Exception as e:
-        print(f"Erro ao comprimir vídeo: {e}")
+        print(f"Erro Vídeo: {e}")
         return False
 
 def comprimir_audio(input_path, output_path):
-    """Converte áudio para Mono e reduz qualidade para análise de IA"""
+    """Otimiza áudio para análise de IA"""
     try:
         audio = AudioSegment.from_file(input_path)
         audio = audio.set_channels(1).set_frame_rate(16000)
         audio.export(output_path, format="mp3", bitrate="64k")
         return True
     except Exception as e:
-        print(f"Erro ao comprimir áudio: {e}")
+        print(f"Erro Áudio: {e}")
         return False
 
-# --- MOTOR DE INTELIGÊNCIA JURÍDICA ELITE ---
+# --- NÚCLEO DE INTELIGÊNCIA JURÍDICA (ESTRATEGISTA DE ELITE) ---
 
 @app.post("/analisar")
 async def analisar_caso(
@@ -73,82 +73,86 @@ async def analisar_caso(
     arquivos: List[UploadFile] = None
 ):
     try:
-        # CAPTURA AUTOMÁTICA DA CHAVE DO RENDER
+        # CAPTURA DA CHAVE CONFIGURADA NO RENDER
         api_key = os.getenv("GEMINI_API_KEY")
         
         if not api_key:
-            print("--- ERRO CRÍTICO ---: Variável GEMINI_API_KEY não encontrada no Render.")
-            return JSONResponse(content={"erro": "Chave API não configurada no servidor Render."}, status_code=500)
+            return JSONResponse(content={"erro": "Configure a GEMINI_API_KEY no painel do Render."}, status_code=500)
 
         conteudos_multimais = []
         texto_autos = ""
 
+        # PROCESSAMENTO DE ANEXOS
         if arquivos:
             for arquivo in arquivos:
                 ext = arquivo.filename.lower().split('.')[-1]
                 corpo = await arquivo.read()
                 
-                temp_input = f"temp_in_{arquivo.filename}"
-                temp_output = f"comp_{arquivo.filename}"
+                temp_in = f"in_{arquivo.filename}"
+                temp_out = f"proc_{arquivo.filename}"
                 
-                with open(temp_input, "wb") as f:
+                with open(temp_in, "wb") as f:
                     f.write(corpo)
 
                 if ext == "pdf":
-                    texto_autos += f"\n[DOC: {arquivo.filename}]\n{extrair_texto_pdf(corpo)}"
+                    texto_autos += f"\n[ARQUIVO: {arquivo.filename}]\n{extrair_texto_pdf(corpo)}"
                 
-                elif ext in ["mp4", "mpeg", "mov", "avi"]:
-                    if comprimir_video(temp_input, temp_output):
-                        with open(temp_output, "rb") as f:
+                elif ext in ["mp4", "mov", "avi"]:
+                    if comprimir_video(temp_in, temp_out):
+                        with open(temp_out, "rb") as f:
                             conteudos_multimais.append(types.Part.from_bytes(data=f.read(), mime_type="video/mp4"))
-                    else:
-                        conteudos_multimais.append(types.Part.from_bytes(data=corpo, mime_type=arquivo.content_type))
                 
-                elif ext in ["mp3", "wav", "m4a", "ogg"]:
-                    if comprimir_audio(temp_input, temp_output):
-                        with open(temp_output, "rb") as f:
+                elif ext in ["mp3", "wav", "m4a"]:
+                    if comprimir_audio(temp_in, temp_out):
+                        with open(temp_out, "rb") as f:
                             conteudos_multimais.append(types.Part.from_bytes(data=f.read(), mime_type="audio/mp3"))
-                    else:
-                        conteudos_multimais.append(types.Part.from_bytes(data=corpo, mime_type=arquivo.content_type))
 
-                for f_temp in [temp_input, temp_output]:
+                # Limpeza de arquivos temporários
+                for f_temp in [temp_in, temp_out]:
                     if os.path.exists(f_temp): os.remove(f_temp)
 
+        # INICIALIZAÇÃO DO CLIENTE GOOGLE GENAI 0.2.0
         client = genai.Client(api_key=api_key)
 
-        instrucoes_sistema = f"""
-        Você é o M.A | JUS IA EXPERIENCE, a inteligência jurídica de elite no Brasil. 
-        Sua especialidade agora é {area_direito}.
-        
-        MISSÃO ESTRATÉGICA:
-        1. JURIMETRIA: Pesquise no Google Search por decisões do magistrado '{magistrado}' no '{tribunal}'. Identifique padrões de julgamento.
-        2. LINHA DO TEMPO: Crie uma cronologia rigorosa. Aponte alertas de prescrição.
-        3. MODO COMBATE: Analise documentos da contraparte e identifique furos na narrativa.
-        4. TRADUÇÃO CLIENTE: Crie um resumo para WhatsApp explicativo e sem juridiquês.
-        5. VISUAL LAW: Petição moderna, persuasiva e escaneável.
+        # --- BLOCO DE DIAGNÓSTICO (LISTAGEM DE MODELOS NOS LOGS) ---
+        print("--- [DIAGNÓSTICO M.A] MODELOS DISPONÍVEIS NA SUA CONTA PAGA ---")
+        try:
+            for m in client.models.list():
+                print(f"Disponível: {m.name}")
+        except Exception as d_err:
+            print(f"Falha ao listar modelos: {d_err}")
+        # -----------------------------------------------------------
 
-        RETORNE ESTRITAMENTE EM JSON:
+        instrucoes_juridicas = f"""
+        Você é o M.A | JUS IA EXPERIENCE, a inteligência jurídica de elite para {area_direito}.
+        
+        TAREFAS DE ALTO NÍVEL:
+        1. JURIMETRIA: Use Google Search para analisar o magistrado '{magistrado}' no '{tribunal}'.
+        2. ESTRATÉGIA: Identifique falhas na narrativa da contraparte e aponte teses vencedoras.
+        3. VISUAL LAW: Crie uma petição persuasiva, moderna e pronta para o protocolo.
+
+        RESPOSTA OBRIGATÓRIA EM JSON:
         {{
-            "resumo_estrategico": "Análise técnica",
-            "jurimetria": "Tendências do juízo",
-            "resumo_cliente": "Texto para WhatsApp",
-            "timeline": [{{ "data": "DD/MM/AAAA", "evento": "descrição", "alerta": "opcional" }}],
-            "vulnerabilidades_contraparte": ["Ponto 1", "..."],
-            "checklist": ["Providência 1", "..."],
-            "base_legal": ["Artigos"],
-            "jurisprudencia": ["Ementas reais"],
-            "doutrina": ["Autores"],
-            "peca_processual": "Texto da petição"
+            "resumo_estrategico": "Análise técnica profunda",
+            "jurimetria": "Comportamento do juiz/tribunal",
+            "resumo_cliente": "Explicação simples para WhatsApp",
+            "timeline": [{{ "data": "DD/MM/AAAA", "evento": "descrição" }}],
+            "vulnerabilidades_contraparte": ["Ponto A", "Ponto B"],
+            "checklist": ["Ação 1", "Ação 2"],
+            "base_legal": ["Artigos fundamentais"],
+            "jurisprudencia": ["Precedentes reais"],
+            "doutrina": ["Autores de peso"],
+            "peca_processual": "Texto completo da petição"
         }}
         """
 
-        prompt_partes = [f"{instrucoes_sistema}\n\nAUTOS:\n{texto_autos}\n\nFATOS:\n{fatos_do_caso}"]
-        prompt_partes.extend(conteudos_multimais)
+        prompt_final = [f"{instrucoes_juridicas}\n\nAUTOS EXTRAÍDOS:\n{texto_autos}\n\nFATOS NARRADOS:\n{fatos_do_caso}"]
+        prompt_final.extend(conteudos_multimais)
 
-       # MOTOR DE ELITE ATUALIZADO PARA 2026 (Compatível com google-genai 0.2.0)
+        # MOTOR DE ELITE ATUALIZADO PARA 2026 (EVITA ERRO 404)
         response = client.models.generate_content(
-            model='gemini-2.5-flash', # O sucessor estável que sua chave exige
-            contents=prompt_partes,
+            model='gemini-2.5-flash', # O padrão de estabilidade para novas contas pagas em 2026
+            contents=prompt_final,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.1,
@@ -159,11 +163,11 @@ async def analisar_caso(
         return JSONResponse(content=json.loads(response.text))
 
     except Exception as e:
-        # DIAGNÓSTICO PARA LOGS DO RENDER
+        # IMPRIME O ERRO REAL NOS LOGS DO RENDER PARA ANÁLISE
         print(f"--- ERRO DETECTADO NO M.A ---: {str(e)}")
         return JSONResponse(content={"erro": str(e)}, status_code=500)
 
-# --- GERADOR DE WORD PROFISSIONAL ---
+# --- GERADOR DE DOCUMENTOS WORD ---
 
 class DadosPeca(BaseModel):
     texto_peca: str
@@ -174,7 +178,7 @@ class DadosPeca(BaseModel):
 @app.post("/gerar_docx")
 async def gerar_docx(dados: DadosPeca):
     doc = docx.Document()
-    # Configuração de Margens de Tribunal
+    # Padrão de Margens Jurídicas
     for s in doc.sections:
         s.top_margin, s.bottom_margin = Cm(3), Cm(2)
         s.left_margin, s.right_margin = Cm(3), Cm(2)
@@ -182,11 +186,10 @@ async def gerar_docx(dados: DadosPeca):
     if dados.advogado_nome:
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        header_text = f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}"
-        run_h = p.add_run(header_text)
-        run_h.font.size, run_h.font.name = Pt(10), 'Times New Roman'
-        run_h.italic = True
-        doc.add_paragraph("\n")
+        header = f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}"
+        run = p.add_run(header)
+        run.font.size, run.font.name = Pt(10), 'Times New Roman'
+        run.italic = True
 
     for linha in dados.texto_peca.split('\n'):
         if linha.strip():
@@ -198,4 +201,4 @@ async def gerar_docx(dados: DadosPeca):
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite_Estrategia.docx"})
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Estrategia_Elite.docx"})
