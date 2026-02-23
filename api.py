@@ -2,6 +2,7 @@ import os
 import io
 import json
 import time
+import shutil
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -14,13 +15,11 @@ from google.genai import types
 
 app = FastAPI()
 
-# --- INTERFACE ---
-
 @app.get("/")
 async def serve_index():
     return FileResponse("index.html")
 
-# --- MOTOR DE INTELIGÊNCIA JURÍDICA (ESTRATÉGIA DE ELITE) ---
+# --- MOTOR DE INTELIGÊNCIA JURÍDICA ---
 
 @app.post("/analisar")
 async def analisar_caso(
@@ -30,62 +29,49 @@ async def analisar_caso(
     tribunal: str = Form(None),
     arquivos: List[UploadFile] = None
 ):
-    temp_files = [] # Para limpeza posterior
+    temp_files = []
     try:
         api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            return JSONResponse(content={"erro": "Chave API não configurada."}, status_code=500)
-
         client = genai.Client(api_key=api_key)
         conteudos_para_ia = []
 
-       # 1. PROCESSAMENTO DE ARQUIVOS (ULTRA EFICIENTE EM RAM)
         if arquivos:
             for arquivo in arquivos:
                 if not arquivo.filename: continue
                 
-                path_temp = f"upload_{int(time.time())}_{arquivo.filename}"
-                
-                # EM VEZ DE .read(), usamos um buffer para salvar direto no disco
-                with open(path_temp, "wb") as buffer:
-                    while True:
-                        chunk = await arquivo.read(1024 * 1024) # Lê 1MB por vez
-                        if not chunk: break
-                        buffer.write(chunk)
-                
+                # Criar caminho temporário
+                path_temp = f"strm_{int(time.time())}_{arquivo.filename}"
                 temp_files.append(path_temp)
 
-                # Envia para o Google (que tem memória ilimitada para ler o arquivo)
+                # TRANSFERÊNCIA DE FLUXO (SHUTIL): Usa 0% de RAM extra
+                # Copia o arquivo do upload diretamente para o disco do Render
+                with open(path_temp, "wb") as buffer:
+                    shutil.copyfileobj(arquivo.file, buffer)
+                
+                # Upload para o Google (Google processa o PDF pesado)
                 file_upload = client.files.upload(path=path_temp)
                 
+                # Aguarda o Google terminar de indexar o arquivo
                 while file_upload.state.name == "PROCESSING":
-                    time.sleep(2)
+                    time.sleep(3)
                     file_upload = client.files.get(name=file_upload.name)
                 
                 conteudos_para_ia.append(file_upload)
 
-        # 2. INSTRUÇÕES DO SISTEMA
+        # Instruções de Sistema
         instrucoes = f"""
-        Você é o M.A | JUS IA EXPERIENCE, a inteligência jurídica de elite.
-        ÁREA: {area_direito}. JUIZ: {magistrado}. TRIBUNAL: {tribunal}.
-        
-        MISSÃO:
-        - Use Google Search para pesquisar precedentes reais e o perfil do magistrado.
-        - Analise os documentos anexados com rigor técnico.
-        - Gere uma petição moderna (Visual Law) e um resumo para o cliente.
-        
-        RETORNE ESTRITAMENTE EM JSON:
+        Você é o M.A | JUS IA EXPERIENCE. Especialista em {area_direito}.
+        Use Google Search para o magistrado '{magistrado}' no '{tribunal}'.
+        Retorne estritamente em JSON:
         {{
             "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
             "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
             "base_legal": [], "jurisprudencia": [], "doutrina": [], "peca_processual": "..."
         }}
         """
+        conteudos_para_ia.append(f"{instrucoes}\n\nFATOS: {fatos_do_caso}")
 
-        conteudos_para_ia.append(f"{instrucoes}\n\nFATOS DO CASO: {fatos_do_caso}")
-
-        # 3. CHAMADA DA IA COM BUSCA ATIVA
-        # Usamos o modelo 2.5 Flash, que é o padrão reconhecido para sua conta paga
+        # Chamada ao modelo 2.5 Flash (Padrão para conta paga em 2026)
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=conteudos_para_ia,
@@ -95,21 +81,14 @@ async def analisar_caso(
             )
         )
 
-        # 4. LIMPEZA E TRATAMENTO DO JSON
-        texto_limpo = response.text.strip()
-        if texto_limpo.startswith("```json"):
-            texto_limpo = texto_limpo.replace("```json", "", 1)
-        if texto_limpo.endswith("```"):
-            texto_limpo = texto_limpo.rsplit("```", 1)[0]
-        
-        return JSONResponse(content=json.loads(texto_limpo.strip()))
+        # Limpeza do JSON (evita erro de coluna 1)
+        res_text = response.text.strip().replace("```json", "").replace("```", "").strip()
+        return JSONResponse(content=json.loads(res_text))
 
     except Exception as e:
-        print(f"--- ERRO CRÍTICO NO M.A ---: {str(e)}")
+        print(f"--- ERRO M.A ---: {str(e)}")
         return JSONResponse(content={"erro": str(e)}, status_code=500)
-    
     finally:
-        # Limpa os arquivos temporários do servidor Render
         for f in temp_files:
             if os.path.exists(f): os.remove(f)
 
@@ -125,8 +104,7 @@ class DadosPeca(BaseModel):
 async def gerar_docx(dados: DadosPeca):
     doc = docx.Document()
     for s in doc.sections:
-        s.top_margin, s.bottom_margin = Cm(3), Cm(2)
-        s.left_margin, s.right_margin = Cm(3), Cm(2)
+        s.top_margin, s.bottom_margin, s.left_margin, s.right_margin = Cm(3), Cm(2), Cm(3), Cm(2)
 
     if dados.advogado_nome:
         p = doc.add_paragraph()
