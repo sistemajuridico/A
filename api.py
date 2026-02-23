@@ -25,7 +25,7 @@ async def limit_upload_size(request: Request, call_next):
         content_length = request.headers.get("content-length")
         if content_length and int(content_length) > MAX_UPLOAD_SIZE:
             return JSONResponse(
-                {"erro": "Arquivo muito grande. O limite máximo é de 50MB."},
+                {"erro": "Arquivo muito grande. O limite máximo é de 50MB. Comprima o PDF antes de enviar."},
                 status_code=413
             )
     return await call_next(request)
@@ -57,9 +57,34 @@ def comprimir_audio(input_path, output_path):
     except Exception as e:
         return False
 
-# NÚCLEO EM 2º PLANO: Processa a IA fora da ligação principal para evitar Timeout
-def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_salvos: list):
+# NÚCLEO EM 2º PLANO: Processa COMPRESSÃO e IA fora da ligação principal
+def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_brutos: list):
+    arquivos_para_gemini = []
     try:
+        # --- AJUSTE: A COMPRESSÃO AGORA ACONTECE NO BACKGROUND ---
+        for temp_input, ext, safe_name in arquivos_brutos:
+            target_file = temp_input
+            mime = "application/pdf"
+            
+            if ext == "pdf": 
+                mime = "application/pdf"
+            elif ext in ["mp4", "mpeg", "mov", "avi"]:
+                mime = "video/mp4"
+                temp_output = f"comp_{safe_name}"
+                if comprimir_video(temp_input, temp_output):
+                    os.remove(temp_input)
+                    target_file = temp_output
+            elif ext in ["mp3", "wav", "m4a", "ogg"]:
+                mime = "audio/mp3"
+                temp_output = f"comp_{safe_name}"
+                if comprimir_audio(temp_input, temp_output):
+                    os.remove(temp_input)
+                    target_file = temp_output
+                    
+            arquivos_para_gemini.append((target_file, mime))
+
+        # --- FIM DO AJUSTE ---
+
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             TASKS[task_id] = {"status": "error", "erro": "Chave API não configurada."}
@@ -68,7 +93,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         client = genai.Client(api_key=api_key)
         conteudos_multimais = []
 
-        for target_file, mime in arquivos_salvos:
+        for target_file, mime in arquivos_para_gemini:
             gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
             while True:
                 f_info = client.files.get(name=gemini_file.name)
@@ -121,12 +146,12 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
 
     except Exception as e:
-        TASKS[task_id] = {"status": "error", "erro": "Erro no processamento da IA. O arquivo pode estar protegido ou o modelo demorou demais."}
+        TASKS[task_id] = {"status": "error", "erro": "Erro no processamento. O arquivo pode estar protegido ou o modelo falhou."}
     finally:
-        for f, m in arquivos_salvos:
+        for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
 
-# --- 2. LEITURA ASSÍNCRONA EM CHUNKS (async def) ---
+# --- 2. LEITURA ASSÍNCRONA EM CHUNKS (SUPER RÁPIDA) ---
 @app.post("/analisar")
 async def analisar_caso(
     background_tasks: BackgroundTasks,
@@ -142,50 +167,33 @@ async def analisar_caso(
     task_id = str(uuid.uuid4())
     TASKS[task_id] = {"status": "processing"}
 
-    arquivos_salvos = []
+    arquivos_brutos = []
     try:
         if arquivos:
             for arquivo in arquivos:
                 if not arquivo.filename: continue
                 ext = arquivo.filename.lower().split('.')[-1]
                 
-                # Nomes seguros gerados por UUID para contornar erros ASCII de caracteres como 'ç' e 'ã'
+                # Nomes seguros gerados por UUID
                 safe_name = f"doc_{uuid.uuid4().hex}.{ext}"
                 temp_input = f"temp_in_{safe_name}"
                 
-                # --- LEITURA DIVIDIDA (A MÁGICA PARA PDFS GRANDES) ---
-                # Lê em pedaços de 1MB e liberta a RAM, não bloqueando o servidor
+                # Leitura dividida inteligente (Chunks)
                 with open(temp_input, "wb") as buffer:
                     while True:
-                        chunk = await arquivo.read(1024 * 1024)
+                        chunk = await arquivo.read(1024 * 1024) # 1MB
                         if not chunk:
                             break
                         buffer.write(chunk)
                 
-                target_file = temp_input
-                mime = "application/pdf"
-                if ext == "pdf": 
-                    mime = "application/pdf"
-                elif ext in ["mp4", "mpeg", "mov", "avi"]:
-                    mime = "video/mp4"
-                    temp_output = f"comp_{safe_name}"
-                    if comprimir_video(temp_input, temp_output):
-                        os.remove(temp_input)
-                        target_file = temp_output
-                elif ext in ["mp3", "wav", "m4a", "ogg"]:
-                    mime = "audio/mp3"
-                    temp_output = f"comp_{safe_name}"
-                    if comprimir_audio(temp_input, temp_output):
-                        os.remove(temp_input)
-                        target_file = temp_output
-                        
-                arquivos_salvos.append((target_file, mime))
+                # Apenas guarda o caminho bruto, a compressão vai para o background
+                arquivos_brutos.append((temp_input, ext, safe_name))
                 
     except Exception as e:
         return JSONResponse(content={"erro": "Erro de codificação ao salvar o arquivo no servidor."}, status_code=500)
 
     # Inicia a IA em 2º plano e liberta o frontend de imediato!
-    background_tasks.add_task(processar_background, task_id, fatos_do_caso, area_direito, magistrado, tribunal, arquivos_salvos)
+    background_tasks.add_task(processar_background, task_id, fatos_do_caso, area_direito, magistrado, tribunal, arquivos_brutos)
     
     return JSONResponse(content={"task_id": task_id})
 
