@@ -39,10 +39,6 @@
         </div>
         <div class="p-6 space-y-6 overflow-y-auto">
             <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Chave API Gemini</label>
-                <input type="password" id="apiKey" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white outline-none focus:border-brand-500" placeholder="Insira sua chave...">
-            </div>
-            <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Especialidade Jurídica</label>
                 <select id="areaDireito" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white">
                     <option value="Direito Civil, Imobiliário e Consumidor">Civil, Imobiliário e Consumidor</option>
@@ -101,7 +97,7 @@
 
                 <div id="loader" class="hidden text-center py-10">
                     <div class="inline-block w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Cruzando dados, juízo e precedentes multimédias...</p>
+                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Otimizando mídias e cruzando dados de Juízo...</p>
                 </div>
 
                 <div id="results" class="hidden space-y-8 pb-20">
@@ -122,13 +118,13 @@
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="glass rounded-2xl p-6 border-l-4 border-l-emerald-500">
-                            <h3 class="text-xs font-black text-emerald-500 uppercase mb-4"><i class="fa-solid fa-list-check mr-2"></i> Providências Necessárias</h3>
+                            <h3 class="text-xs font-black text-emerald-500 uppercase mb-4"><i class="fa-solid fa-list-check mr-2"></i> Providências</h3>
                             <ul id="checklist" class="space-y-2"></ul>
                         </div>
                         <div class="glass rounded-2xl p-6 border-l-4 border-l-green-500">
                             <div class="flex justify-between items-start mb-4">
                                 <h3 class="text-xs font-black text-green-500 uppercase"><i class="fa-brands fa-whatsapp mr-2"></i> Report p/ Cliente</h3>
-                                <button onclick="copyWA()" class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/20 hover:bg-green-500 hover:text-white transition-all">COPIAR</button>
+                                <button onclick="copyWA()" class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/20">COPIAR</button>
                             </div>
                             <p id="resumo_cliente" class="text-sm text-slate-300 font-sans leading-relaxed"></p>
                         </div>
@@ -175,14 +171,12 @@
         }
 
         async function processar() {
-            const apiKey = document.getElementById('apiKey').value;
-            if(!apiKey) return alert("Por favor, insira a sua API Key.");
-            
+            // O loader agora avisa sobre a otimização de mídias
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('results').classList.add('hidden');
 
             const fd = new FormData();
-            fd.append("api_key", apiKey);
+            // Já não pegamos nem enviamos a apiKey, pois o Render já a tem.
             fd.append("fatos_do_caso", document.getElementById('fatosCaso').value);
             fd.append("area_direito", document.getElementById('areaDireito').value);
             fd.append("magistrado", document.getElementById('magistrado').value);
@@ -201,26 +195,22 @@
                 document.getElementById('resumo_cliente').innerText = d.resumo_cliente;
                 document.getElementById('peca').value = d.peca_processual;
 
-                // Timeline
                 const tc = document.getElementById('timeline'); tc.innerHTML = '';
                 (d.timeline || []).forEach(t => {
                     tc.innerHTML += `<div class="timeline-item relative">
                         <span class="text-[10px] font-bold text-brand-500">${t.data}</span>
                         <p class="text-xs text-white">${t.evento}</p>
-                        ${t.alerta ? `<p class="text-[9px] text-red-400 mt-1 italic">⚠️ ${t.alerta}</p>` : ''}
                     </div>`;
                 });
 
-                // Vulnerabilidades
                 const vc = document.getElementById('vulnerabilidades'); vc.innerHTML = '';
                 (d.vulnerabilidades_contraparte || []).forEach(v => {
-                    vc.innerHTML += `<li class="p-3 bg-red-500/5 border border-red-500/10 rounded-lg text-xs text-slate-400"><i class="fa-solid fa-crosshairs text-red-500 mr-2"></i> ${v}</li>`;
+                    vc.innerHTML += `<li class="p-3 bg-red-500/5 border border-red-500/10 rounded-lg text-xs text-slate-400">× ${v}</li>`;
                 });
 
-                // Checklist
                 const cl = document.getElementById('checklist'); cl.innerHTML = '';
                 (d.checklist || []).forEach(c => {
-                    cl.innerHTML += `<li class="flex items-center gap-2 text-xs text-slate-300 p-1"><i class="fa-regular fa-square-check text-emerald-500"></i> ${c}</li>`;
+                    cl.innerHTML += `<li class="flex items-center gap-2 text-xs text-slate-300"><i class="fa-regular fa-square-check text-emerald-500"></i> ${c}</li>`;
                 });
 
                 const carregarL = (lista, id, color) => {
@@ -234,14 +224,14 @@
                 document.getElementById('loader').classList.add('hidden');
                 document.getElementById('results').classList.remove('hidden');
             } catch (e) { 
-                alert("Erro no processamento. Verifique a sua chave e ligação."); 
+                alert("Erro: " + e.message); 
                 document.getElementById('loader').classList.add('hidden'); 
             }
         }
 
         function copyWA() { 
             navigator.clipboard.writeText(document.getElementById('resumo_cliente').innerText); 
-            alert("Texto para cliente copiado!"); 
+            alert("Texto copiado!"); 
         }
 
         async function baixarDoc() {
@@ -259,7 +249,7 @@
                 });
                 const b = await res.blob();
                 const u = window.URL.createObjectURL(b);
-                const a = document.createElement('a'); a.href = u; a.download = "MA_Estrategia_Elite.docx"; a.click();
+                const a = document.createElement('a'); a.href = u; a.download = "MA_Elite_Estrategia.docx"; a.click();
             } catch(e) { alert("Erro ao gerar o Word."); }
         }
     </script>
