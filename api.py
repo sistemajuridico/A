@@ -145,9 +145,9 @@ async def analisar_caso(
         prompt_partes = [f"{instrucoes_sistema}\n\nAUTOS:\n{texto_autos}\n\nFATOS:\n{fatos_do_caso}"]
         prompt_partes.extend(conteudos_multimais)
 
-       # USANDO O 1.5 PRO (O MODELO MAIS ESTÁVEL E POTENTE PARA CONTAS PAGAS)
+       # MOTOR DE ELITE ATUALIZADO PARA 2026 (Compatível com google-genai 0.2.0)
         response = client.models.generate_content(
-            model='gemini-1.5-pro', # Mude para este nome exato
+            model='gemini-2.5-flash', # O sucessor estável que sua chave exige
             contents=prompt_partes,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
