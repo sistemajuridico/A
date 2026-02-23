@@ -145,9 +145,9 @@ async def analisar_caso(
         prompt_partes = [f"{instrucoes_sistema}\n\nAUTOS:\n{texto_autos}\n\nFATOS:\n{fatos_do_caso}"]
         prompt_partes.extend(conteudos_multimais)
 
-        # MUDANÇA PARA 1.5 FLASH PARA ESTABILIDADE TOTAL
+       # VOLTANDO PARA O 2.0 FLASH (O MOTOR DE ELITE RECONHECIDO PELO SEU SISTEMA)
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-2.0-flash', # Mude de 1.5 para 2.0 aqui
             contents=prompt_partes,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
