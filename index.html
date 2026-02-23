@@ -31,6 +31,10 @@
         .tab-active { border-bottom: 2px solid #3b82f6; color: white; }
         .check-item { transition: all 0.2s; }
         .check-item:hover { background: rgba(59, 130, 246, 0.1); }
+        
+        @media (max-width: 768px) {
+            #sidebar { width: 100%; max-width: 300px; }
+        }
     </style>
 </head>
 <body class="flex h-screen antialiased">
@@ -99,7 +103,7 @@
                     <i class="fa-solid fa-brain"></i> PROCESSAR INTELIGÊNCIA JURÍDICA
                 </button>
 
-                <div id="loadingArea" class="hidden py-16 flex flex-col items-center justify-center space-y-4">
+                <div id="loadingArea" class="hidden py-16 flex flex-col items-center justify-center space-y-4 text-center">
                     <div class="ai-pulse"></div>
                     <p class="text-brand-400 animate-pulse font-medium tracking-wide">M.A está realizando o cruzamento de dados e jurisprudência...</p>
                 </div>
@@ -114,8 +118,7 @@
                         
                         <div class="glass-card rounded-2xl p-6 border-l-4 border-l-emerald-500">
                             <h3 class="text-xs font-black text-emerald-400 uppercase tracking-tighter mb-3">Checklist de Provas & Providências</h3>
-                            <ul id="checklistProvas" class="space-y-2">
-                                </ul>
+                            <ul id="checklistProvas" class="space-y-2"></ul>
                         </div>
                     </div>
 
@@ -197,15 +200,16 @@
                 const res = await fetch('/analisar', { method: 'POST', body: formData });
                 const d = await res.json();
                 
-                // Mapeia o resumo estratégico
+                if (d.erro) {
+                    throw new Error(d.erro);
+                }
+
                 document.getElementById('resumoEstrategico').innerText = d.resumo_estrategico;
 
-                // Gera o Checklist de Provas (Simulado com base na análise de IA)
+                // Checklist Dinâmico da IA
                 const listCheck = document.getElementById('checklistProvas');
                 listCheck.innerHTML = '';
-                // A IA agora sugere provas dentro do JSON. Vamos usar a base legal e resumo para inferir se não houver campo específico
-                const provasSugeridas = ["Análise de nexo causal", "Verificação de prazos prescricionais", "Coleta de provas documentais citadas"];
-                provasSugeridas.forEach(p => {
+                (d.checklist || []).forEach(p => {
                     listCheck.innerHTML += `<li class="check-item flex items-center gap-3 p-2 rounded-lg text-xs text-slate-300 italic"><i class="fa-regular fa-square-check text-emerald-500"></i> ${p}</li>`;
                 });
                 
@@ -225,7 +229,7 @@
                 document.getElementById('loadingArea').classList.add('hidden');
                 document.getElementById('resultadoArea').classList.remove('hidden');
             } catch (e) { 
-                alert("Erro na conexão com o servidor. Verifique sua chave API."); 
+                alert("Erro: " + e.message); 
                 document.getElementById('loadingArea').classList.add('hidden'); 
             }
         }
@@ -237,17 +241,22 @@
                 advogado_oab: document.getElementById('advOAB').value,
                 advogado_endereco: document.getElementById('advEndereco').value
             };
-            const res = await fetch('/gerar_docx', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = "Peca_Processual_MA_Premium.docx";
-            a.click();
+            try {
+                const res = await fetch('/gerar_docx', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) throw new Error("Erro ao gerar Word");
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "Peca_Processual_MA_Premium.docx";
+                a.click();
+            } catch (e) {
+                alert("Erro ao baixar arquivo: " + e.message);
+            }
         }
     </script>
 </body>
