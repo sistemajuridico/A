@@ -12,94 +12,23 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        serif: ['Playfair Display', 'serif'],
-                    },
-                    colors: {
-                        deep: '#050505',
-                        panel: '#0f1115',
-                        bordercolor: '#1f2937',
-                        brand: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' }
-                    }
+                    fontFamily: { sans: ['Inter', 'sans-serif'], serif: ['Playfair Display', 'serif'] },
+                    colors: { deep: '#050505', panel: '#0f1115', bordercolor: '#1f2937', brand: { 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb' } }
                 }
             }
         }
     </script>
     <style>
         body { background-color: #050505; color: #e2e8f0; overflow-x: hidden; }
-        
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #0f1115; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-        .glass-card {
-            background: rgba(15, 17, 21, 0.7);
-            backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
-        }
-        
-        .input-dark {
-            background-color: rgba(0, 0, 0, 0.2);
-            border: 1px solid #1f2937;
-            color: #f8fafc;
-            transition: all 0.3s ease;
-        }
-        .input-dark:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-            outline: none;
-            background-color: rgba(15, 17, 21, 0.9);
-        }
-
-        .btn-glow {
-            background: linear-gradient(135deg, #1e3a8a, #3b82f6);
-            border: 1px solid rgba(96, 165, 250, 0.3);
-            transition: all 0.3s ease;
-        }
-        .btn-glow:hover {
-            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
-            transform: translateY(-1px);
-        }
-
-        .file-drop-area {
-            border: 2px dashed #334155;
-            background-color: rgba(30, 41, 59, 0.3);
-            transition: all 0.3s ease;
-        }
-        .file-drop-area:hover { border-color: #60a5fa; }
-
-        .gradient-text {
-            background: linear-gradient(to right, #60a5fa, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .ai-pulse {
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            background: conic-gradient(from 0deg, #3b82f6, #8b5cf6, transparent);
-            animation: spin 1.5s linear infinite;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .ai-pulse::after {
-            content: "";
-            width: 32px; height: 32px;
-            background: #0f1115;
-            border-radius: 50%;
-            position: absolute;
-        }
+        .glass-card { background: rgba(15, 17, 21, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .input-dark { background-color: rgba(0, 0, 0, 0.2); border: 1px solid #1f2937; color: #f8fafc; outline: none; }
+        .input-dark:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+        .btn-glow { background: linear-gradient(135deg, #1e3a8a, #3b82f6); transition: all 0.3s ease; }
+        .btn-glow:hover { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); transform: translateY(-1px); }
+        .ai-pulse { width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(from 0deg, #3b82f6, #8b5cf6, transparent); animation: spin 1.5s linear infinite; display: flex; align-items: center; justify-content: center; position: relative; }
+        .ai-pulse::after { content: ""; width: 32px; height: 32px; background: #0f1115; border-radius: 50%; position: absolute; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-
-        /* Estilo para garantir que o menu lateral cubra a tela no mobile */
-        @media (max-width: 768px) {
-            #sidebar {
-                width: 100%;
-                max-width: 300px;
-            }
-        }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: white; }
     </style>
 </head>
 <body class="flex h-screen antialiased">
@@ -110,22 +39,16 @@
                 <h1 class="font-serif text-3xl font-bold tracking-tight text-white mb-1">M.A</h1>
                 <p class="text-[0.65rem] font-bold uppercase tracking-widest text-slate-500">Inteligência Jurídica</p>
             </div>
-            <button onclick="toggleMenu()" class="md:hidden text-slate-500 text-2xl p-2">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
+            <button onclick="toggleMenu()" class="md:hidden text-slate-500 text-2xl p-2"><i class="fa-solid fa-xmark"></i></button>
         </div>
 
         <div class="p-6 flex-1 overflow-y-auto space-y-8">
             <div>
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                    <i class="fa-solid fa-key mr-2 text-brand-500"></i> Credenciais da IA
-                </label>
-                <input type="password" id="apiKey" class="input-dark w-full p-3 rounded-lg text-sm mb-3" placeholder="Sua chave Gemini...">
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Chave da API</label>
+                <input type="password" id="apiKey" class="input-dark w-full p-3 rounded-lg text-sm mb-3" placeholder="Google Gemini Key">
                 
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-4">
-                    <i class="fa-solid fa-scale-unbalanced mr-2 text-brand-500"></i> Ramo do Direito
-                </label>
-                <select id="areaDireito" class="input-dark w-full p-3 rounded-lg text-sm appearance-none">
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-4">Ramo do Direito</label>
+                <select id="areaDireito" class="input-dark w-full p-3 rounded-lg text-sm">
                     <option value="Direito Civil, Imobiliário e Consumidor">Civil, Imobiliário e Consumidor</option>
                     <option value="Direito de Família e Sucessões">Família e Sucessões</option>
                     <option value="Direito Penal e Processual Penal">Penal e Processual Penal</option>
@@ -136,83 +59,73 @@
             </div>
 
             <div class="pt-4 border-t border-bordercolor">
-                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                    <i class="fa-solid fa-signature mr-2 text-amber-500"></i> Assinatura na Peça
-                </label>
-                <input type="text" id="advNome" class="input-dark w-full p-3 rounded-lg text-sm mb-3" placeholder="Nome do Advogado(a)">
-                <input type="text" id="advOAB" class="input-dark w-full p-3 rounded-lg text-sm mb-3" placeholder="OAB (Ex: SP 123.456)">
-                <textarea id="advEndereco" rows="2" class="input-dark w-full p-3 rounded-lg text-sm resize-none" placeholder="Endereço/Contato para cabeçalho..."></textarea>
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Dados do Advogado</label>
+                <input type="text" id="advNome" class="input-dark w-full p-3 rounded-lg text-sm mb-3" placeholder="Nome do Advogado">
+                <input type="text" id="advOAB" class="input-dark w-full p-3 rounded-lg text-sm mb-3" placeholder="Número da OAB">
+                <textarea id="advEndereco" rows="2" class="input-dark w-full p-3 rounded-lg text-sm resize-none" placeholder="Endereço e Contato"></textarea>
             </div>
         </div>
     </aside>
 
     <main class="flex-1 flex flex-col h-full overflow-hidden relative">
-        
         <div class="md:hidden flex items-center justify-between p-4 border-b border-bordercolor bg-panel shadow-lg z-20">
             <span class="font-serif font-bold text-white tracking-tight">M.A <span class="text-brand-500 text-xs">JURÍDICO</span></span>
-            <button onclick="toggleMenu()" class="text-brand-400 p-2 border border-brand-500/30 rounded-lg">
-                <i class="fa-solid fa-bars text-xl"></i>
-            </button>
+            <button onclick="toggleMenu()" class="text-brand-400 p-2"><i class="fa-solid fa-bars text-xl"></i></button>
         </div>
-
-        <div class="absolute top-0 left-0 w-full h-96 bg-brand-500/5 blur-[120px] -z-10 pointer-events-none"></div>
 
         <div class="flex-1 overflow-y-auto p-6 md:p-12 pb-32">
             <div class="max-w-5xl mx-auto">
-                
-                <header class="mb-10">
-                    <h2 class="text-3xl md:text-4xl font-serif text-white mb-2">M.A <span class="text-brand-500">|</span> <span class="gradient-text font-bold">Inteligência Jurídica</span></h2>
-                    <p class="text-slate-400 text-lg">Sistema avançado de pesquisa e redação jurídica</p>
+                <header class="mb-10 text-center md:text-left">
+                    <h2 class="text-3xl md:text-4xl font-serif text-white mb-2">Análise <span class="text-brand-500">Estratégica</span></h2>
+                    <p class="text-slate-400">Relate o caso e anexe os documentos para iniciar.</p>
                 </header>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                    <div class="lg:col-span-2 glass-card rounded-2xl p-1">
-                        <textarea id="fatosCaso" rows="7" class="w-full bg-transparent p-5 text-slate-200 placeholder-slate-600 border-none outline-none resize-none" placeholder="Relate os fatos aqui..."></textarea>
+                    <div class="lg:col-span-2 glass-card rounded-2xl p-4">
+                        <textarea id="fatosCaso" rows="8" class="w-full bg-transparent p-2 text-slate-200 placeholder-slate-600 outline-none resize-none" placeholder="Relate os fatos aqui..."></textarea>
                     </div>
-
                     <div class="lg:col-span-1">
-                        <div class="file-drop-area h-full rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer" onclick="document.getElementById('arquivosPDF').click()">
+                        <div class="border-2 border-dashed border-slate-700 h-full rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 transition-colors" onclick="document.getElementById('arquivosPDF').click()">
                             <input type="file" id="arquivosPDF" multiple accept=".pdf" class="hidden" onchange="mostrarNomesArquivos()">
-                            <i class="fa-solid fa-file-pdf text-4xl text-slate-500 mb-3"></i>
-                            <h4 class="text-sm font-medium text-slate-300 mb-1">Anexar Autos (PDF)</h4>
-                            <p class="text-xs text-slate-500" id="textoArquivos">Clique para selecionar</p>
+                            <i class="fa-solid fa-file-pdf text-4xl text-slate-600 mb-3"></i>
+                            <p class="text-xs text-slate-500" id="textoArquivos">Anexar PDFs dos Autos</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex justify-end border-t border-white/5 pt-6">
-                    <button onclick="enviarParaAPI()" class="btn-glow text-white px-8 py-4 rounded-xl font-medium w-full md:w-auto flex items-center justify-center gap-3">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Executar Análise
-                    </button>
-                </div>
+                <button onclick="enviarParaAPI()" class="btn-glow text-white px-8 py-4 rounded-xl font-medium w-full flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-gavel"></i> Executar Análise Jurídica
+                </button>
 
-                <div id="loadingArea" class="hidden py-16 flex flex-col items-center justify-center space-y-4 text-center">
+                <div id="loadingArea" class="hidden py-16 flex flex-col items-center justify-center space-y-4">
                     <div class="ai-pulse"></div>
-                    <p class="text-brand-400 font-medium tracking-wide animate-pulse">Processando fatos e jurisprudência...</p>
+                    <p class="text-brand-400 animate-pulse italic">Consultando legislação, jurisprudência e doutrina...</p>
                 </div>
 
-                <div id="resultadoArea" class="hidden space-y-8 mt-10">
-                    <div class="glass-card rounded-2xl p-8 border-l-4 border-l-brand-500">
-                        <h3 class="text-sm font-bold text-brand-400 uppercase tracking-widest mb-4">Parecer da IA</h3>
-                        <p id="resumoEstrategico" class="text-lg text-slate-200 leading-relaxed font-serif"></p>
+                <div id="resultadoArea" class="hidden mt-10 space-y-8">
+                    <div class="glass-card rounded-2xl p-6 border-l-4 border-l-brand-500">
+                        <h3 class="text-xs font-bold text-brand-400 uppercase mb-2">Tese Sugerida</h3>
+                        <p id="resumoEstrategico" class="text-slate-200 leading-relaxed font-serif text-lg"></p>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="glass-card rounded-2xl p-6">
-                            <h3 class="text-lg font-medium text-white mb-4"><i class="fa-solid fa-book-bookmark text-emerald-400 mr-2"></i> Base Legal</h3>
-                            <ul id="listaBaseLegal" class="space-y-4 text-sm text-slate-300"></ul>
+                    <div class="glass-card rounded-2xl overflow-hidden">
+                        <div class="flex border-b border-bordercolor bg-black/20">
+                            <button onclick="mudarTab('legal')" id="tab-legal" class="flex-1 p-4 text-sm font-medium tab-active">Base Legal</button>
+                            <button onclick="mudarTab('juris')" id="tab-juris" class="flex-1 p-4 text-sm font-medium text-slate-500">Jurisprudência</button>
+                            <button onclick="mudarTab('doutrina')" id="tab-doutrina" class="flex-1 p-4 text-sm font-medium text-slate-500">Doutrina</button>
                         </div>
-                        <div class="glass-card rounded-2xl p-6">
-                            <h3 class="text-lg font-medium text-white mb-4"><i class="fa-solid fa-gavel text-amber-400 mr-2"></i> Jurisprudência</h3>
-                            <ul id="listaJurisprudencia" class="space-y-4 text-sm text-slate-300"></ul>
+                        <div class="p-6">
+                            <ul id="listaLegal" class="space-y-3"></ul>
+                            <ul id="listaJuris" class="hidden space-y-3"></ul>
+                            <ul id="listaDoutrina" class="hidden space-y-3"></ul>
                         </div>
                     </div>
 
-                    <div class="glass-card rounded-2xl p-6 border border-brand-500/30">
-                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-                            <h3 class="text-lg font-medium text-white"><i class="fa-solid fa-file-contract text-brand-400 mr-2"></i> Minuta Processual</h3>
-                            <button onclick="baixarWord()" class="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg text-sm font-medium w-full md:w-auto">
-                                <i class="fa-solid fa-download mr-2"></i> Baixar Word (.docx)
+                    <div class="glass-card rounded-2xl p-6 border border-brand-500/20">
+                        <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+                            <h3 class="text-lg font-medium text-white italic">Minuta da Peça</h3>
+                            <button onclick="baixarWord()" class="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg text-sm w-full md:w-auto">
+                                <i class="fa-solid fa-file-word mr-2"></i> Baixar Word (.docx)
                             </button>
                         </div>
                         <textarea id="textoPeca" rows="15" class="input-dark w-full p-4 rounded-xl text-sm font-serif leading-relaxed"></textarea>
@@ -223,96 +136,86 @@
     </main>
 
     <script>
-        // FUNÇÃO PARA ABRIR/FECHAR MENU NO MOBILE
         function toggleMenu() {
-            const sidebar = document.getElementById('sidebar');
-            if (sidebar.classList.contains('hidden')) {
-                sidebar.classList.remove('hidden');
-                sidebar.classList.add('flex');
-            } else {
-                sidebar.classList.add('hidden');
-                sidebar.classList.remove('flex');
-            }
+            const s = document.getElementById('sidebar');
+            s.classList.toggle('hidden');
+            s.classList.toggle('flex');
+        }
+
+        function mudarTab(tipo) {
+            ['legal', 'juris', 'doutrina'].forEach(t => {
+                document.getElementById('lista' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
+                document.getElementById('tab-' + t).classList.remove('tab-active');
+                document.getElementById('tab-' + t).classList.add('text-slate-500');
+            });
+            document.getElementById('lista' + tipo.charAt(0).toUpperCase() + tipo.slice(1)).classList.remove('hidden');
+            document.getElementById('tab-' + tipo).classList.add('tab-active');
+            document.getElementById('tab-' + tipo).classList.remove('text-slate-500');
         }
 
         function mostrarNomesArquivos() {
             const input = document.getElementById('arquivosPDF');
-            const texto = document.getElementById('textoArquivos');
-            texto.innerHTML = input.files.length > 0 ? `<span class="text-brand-400 font-bold">${input.files.length} arquivo(s)</span>` : "Clique para selecionar";
+            document.getElementById('textoArquivos').innerText = input.files.length + " arquivo(s) selecionado(s)";
         }
 
         async function enviarParaAPI() {
             const apiKey = document.getElementById('apiKey').value;
             const fatos = document.getElementById('fatosCaso').value;
-            const area = document.getElementById('areaDireito').value;
-            const arquivos = document.getElementById('arquivosPDF').files;
+            if(!apiKey || !fatos) return alert("Chave API e Fatos são obrigatórios.");
 
-            if(!apiKey || !fatos) {
-                alert("Preencha a chave API e os fatos.");
-                return;
-            }
-
-            // No mobile, fecha o menu ao clicar em processar para ver o resultado
-            if (window.innerWidth < 768) {
-                document.getElementById('sidebar').classList.add('hidden');
-            }
-
+            if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('hidden');
             document.getElementById('loadingArea').classList.remove('hidden');
             document.getElementById('resultadoArea').classList.add('hidden');
 
             const formData = new FormData();
             formData.append("api_key", apiKey);
             formData.append("fatos_do_caso", fatos);
-            formData.append("area_direito", area);
-            for(let i = 0; i < arquivos.length; i++) { formData.append("arquivos", arquivos[i]); }
+            formData.append("area_direito", document.getElementById('areaDireito').value);
+            const files = document.getElementById('arquivosPDF').files;
+            for(let i=0; i<files.length; i++) formData.append("arquivos", files[i]);
 
             try {
-                const resposta = await fetch('/analisar', { method: 'POST', body: formData });
-                const dados = await resposta.json();
-
-                document.getElementById('resumoEstrategico').innerText = dados.resumo_estrategico;
+                const res = await fetch('/analisar', { method: 'POST', body: formData });
+                const d = await res.json();
                 
-                const formatarLista = (array, elementoId, cor) => {
-                    const ul = document.getElementById(elementoId);
-                    ul.innerHTML = '';
-                    array?.forEach(item => { 
-                        ul.innerHTML += `<li class="flex gap-2 bg-black/20 p-2 rounded border border-white/5"><i class="fa-solid fa-caret-right mt-1 text-${cor}-400"></i><span>${item}</span></li>`; 
+                document.getElementById('resumoEstrategico').innerText = d.resumo_estrategico;
+                
+                const carregarLista = (lista, id, icon, color) => {
+                    const el = document.getElementById(id);
+                    el.innerHTML = '';
+                    (lista || []).forEach(item => {
+                        el.innerHTML += `<li class="p-3 bg-white/5 rounded-lg border border-white/5 text-sm"><i class="fa-solid ${icon} mr-2 ${color}"></i> ${item}</li>`;
                     });
                 };
 
-                formatarLista(dados.base_legal, 'listaBaseLegal', 'emerald');
-                formatarLista(dados.jurisprudencia, 'listaJurisprudencia', 'amber');
-                document.getElementById('textoPeca').value = dados.peca_processual || "";
-
+                carregarLista(d.base_legal, 'listaLegal', 'fa-book', 'text-emerald-400');
+                carregarLista(d.jurisprudencia, 'listaJuris', 'fa-gavel', 'text-amber-400');
+                carregarLista(d.doutrina, 'listaDoutrina', 'fa-pen-nib', 'text-brand-400');
+                
+                document.getElementById('textoPeca').value = d.peca_processual;
                 document.getElementById('loadingArea').classList.add('hidden');
                 document.getElementById('resultadoArea').classList.remove('hidden');
-            } catch (erro) {
-                alert("Erro: " + erro.message);
-                document.getElementById('loadingArea').classList.add('hidden');
-            }
+            } catch (e) { alert("Erro na análise."); document.getElementById('loadingArea').classList.add('hidden'); }
         }
 
         async function baixarWord() {
-            const dados = {
+            const payload = {
                 texto_peca: document.getElementById('textoPeca').value,
                 advogado_nome: document.getElementById('advNome').value,
                 advogado_oab: document.getElementById('advOAB').value,
                 advogado_endereco: document.getElementById('advEndereco').value
             };
-
-            try {
-                const resposta = await fetch('/gerar_docx', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dados)
-                });
-                const blob = await resposta.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = "peca_processual_MA.docx";
-                a.click();
-            } catch (erro) { alert("Erro ao baixar Word."); }
+            const res = await fetch('/gerar_docx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "Peca_M_A.docx";
+            a.click();
         }
     </script>
 </body>
