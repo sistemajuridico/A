@@ -154,7 +154,6 @@ async def analisar_caso(
             model='gemini-2.5-flash', # O padrão de estabilidade para novas contas pagas em 2026
             contents=prompt_final,
             config=types.GenerateContentConfig(
-                response_mime_type="application/json",
                 temperature=0.1,
                 tools=[{"google_search": {}}]
             )
