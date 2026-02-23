@@ -55,7 +55,7 @@ async def analisar_caso(
         client = genai.Client(api_key=api_key)
 
         instrucoes_sistema = f"""
-        Você é o M.A JURÍDICO ELITE. Especialista em {area_direito}.
+        Você é o M.A | JUS IA EXPERIENCE, a inteligência jurídica mais avançada do mercado brasileiro. Especialista em {area_direito}.
         Sua missão é fornecer Inteligência Estratégica Total.
 
         OBJETIVOS OBRIGATÓRIOS:
