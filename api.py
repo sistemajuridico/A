@@ -13,38 +13,39 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
-# Bibliotecas de compressão para otimizar o Render Free
-from moviepy.editor import VideoFileClip
-from pydub import AudioSegment
-
 app = FastAPI()
 
 # --- ROTA DE ENTRADA ---
 
 @app.get("/")
 async def serve_index():
+    """Serve o ficheiro index.html na raiz do servidor"""
     return FileResponse("index.html")
 
 # --- UTILITÁRIOS DE TRATAMENTO E COMPRESSÃO ---
 
 def comprimir_video(input_path, output_path):
+    """Reduz vídeo para 480p e 15fps para não estourar a RAM"""
     try:
+        from moviepy.editor import VideoFileClip
         with VideoFileClip(input_path) as video:
             video_redimensionado = video.resize(height=480)
             video_redimensionado.write_videofile(output_path, fps=15, codec="libx264", audio_codec="aac", logger=None)
         return True
     except Exception as e:
-        print(f"Erro vídeo: {e}")
+        print(f"Erro ao comprimir vídeo: {e}")
         return False
 
 def comprimir_audio(input_path, output_path):
+    """Converte áudio para Mono e reduz qualidade para análise de IA"""
     try:
+        from pydub import AudioSegment
         audio = AudioSegment.from_file(input_path)
         audio = audio.set_channels(1).set_frame_rate(16000)
         audio.export(output_path, format="mp3", bitrate="64k")
         return True
     except Exception as e:
-        print(f"Erro áudio: {e}")
+        print(f"Erro ao comprimir áudio: {e}")
         return False
 
 # --- MOTOR DE INTELIGÊNCIA JURÍDICA ELITE ---
@@ -55,7 +56,7 @@ async def analisar_caso(
     area_direito: str = Form(...),
     magistrado: str = Form(None),
     tribunal: str = Form(None),
-    arquivos: List[UploadFile] = None
+    arquivos: Optional[List[UploadFile]] = File(None)
 ):
     temp_files_to_clean = []
     try:
@@ -68,7 +69,9 @@ async def analisar_caso(
 
         if arquivos:
             for arquivo in arquivos:
-                if not arquivo.filename: continue
+                if not arquivo.filename:
+                    continue
+                    
                 ext = arquivo.filename.lower().split('.')[-1]
                 temp_input = f"temp_in_{int(time.time())}_{arquivo.filename}"
                 temp_files_to_clean.append(temp_input)
@@ -95,14 +98,16 @@ async def analisar_caso(
                         target_file = temp_output
                         temp_files_to_clean.append(temp_output)
 
-                # UPLOAD PARA GOOGLE CLOUD (OCR AUTOMÁTICO)
+                # UPLOAD DIRETO PARA GOOGLE (Suporta PDFs gigantes e escaneados)
                 gemini_file = client.files.upload(path=target_file, config={'mime_type': mime})
                 
-                while gemini_file.state.name == "PROCESSING":
+                while True:
+                    f_info = client.files.get(name=gemini_file.name)
+                    if f_info.state.name != "PROCESSING":
+                        break
                     time.sleep(2)
-                    gemini_file = client.files.get(name=gemini_file.name)
 
-                conteudos_multimais.append(gemini_file)
+                conteudos_multimais.append(f_info)
 
         instrucoes_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE. Especialidade: {area_direito}.
@@ -115,10 +120,11 @@ async def analisar_caso(
         }}
         """
 
-        prompt_partes = [f"{instrucoes_sistema}\n\nFATOS: {fatos_do_caso}"]
+        prompt_partes = [f"{instrucoes_sistema}\n\nFATOS:\n{fatos_do_caso}"]
         prompt_partes.extend(conteudos_multimais)
 
-        # AJUSTE: MOTOR 2.5 E REMOÇÃO DO CONFLITO DE JSON
+        # AJUSTE 1: REMOÇÃO DO CONFLITO JSON + SEARCH
+        # AJUSTE 2: ATUALIZAÇÃO PARA MODELO 2.5 FLASH (2026)
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
             contents=prompt_partes,
@@ -128,9 +134,14 @@ async def analisar_caso(
             )
         )
 
-        # LIMPEZA DE JSON MANUAL (EVITA ERRO DE COLUNA 1)
-        texto_limpo = response.text.strip().replace("```json", "").replace("```", "").strip()
-        return JSONResponse(content=json.loads(texto_limpo))
+        # AJUSTE 3: LIMPEZA DE TEXTO PARA EVITAR ERRO DE PARSING
+        texto_puro = response.text.strip()
+        if texto_puro.startswith("```json"):
+            texto_puro = texto_puro.replace("```json", "", 1)
+        if texto_puro.endswith("```"):
+            texto_puro = texto_puro.rsplit("```", 1)[0]
+        
+        return JSONResponse(content=json.loads(texto_puro.strip()))
 
     except Exception as e:
         print(f"--- ERRO M.A ---: {str(e)}")
@@ -139,7 +150,7 @@ async def analisar_caso(
         for f in temp_files_to_clean:
             if os.path.exists(f): os.remove(f)
 
-# --- GERADOR DE WORD ---
+# --- GERADOR DE WORD PROFISSIONAL ---
 
 class DadosPeca(BaseModel):
     texto_peca: str
@@ -157,9 +168,11 @@ async def gerar_docx(dados: DadosPeca):
     if dados.advogado_nome:
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        header = f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}"
-        run = p.add_run(header)
-        run.font.size, run.font.name, run.italic = Pt(10), 'Times New Roman', True
+        header_text = f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}"
+        run_h = p.add_run(header_text)
+        run_h.font.size, run_h.font.name = Pt(10), 'Times New Roman'
+        run_h.italic = True
+        doc.add_paragraph("\n")
 
     for linha in dados.texto_peca.split('\n'):
         if linha.strip():
@@ -171,4 +184,4 @@ async def gerar_docx(dados: DadosPeca):
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite_Estrategia.docx"})
