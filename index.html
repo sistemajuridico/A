@@ -22,37 +22,43 @@
         body { background-color: #020617; color: #f1f5f9; }
         .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .btn-premium { background: linear-gradient(135deg, #1d4ed8, #3b82f6); box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: white; }
         .timeline-item::before { content: ''; position: absolute; left: -17px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; border: 2px solid #020617; }
-        .ai-glow { animation: pulse-glow 2s infinite ease-in-out; }
-        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.2); } 50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); } }
     </style>
 </head>
 <body class="flex h-screen antialiased">
 
     <aside id="sidebar" class="hidden md:flex flex-col w-80 border-r border-bordercolor bg-panel h-full z-50 fixed md:relative transition-all">
         <div class="p-8 border-b border-bordercolor text-center flex justify-between items-center md:block">
-            <h1 class="font-serif text-3xl font-bold text-white">M.A</h1>
+            <h1 class="font-serif text-3xl font-bold text-white tracking-tighter">M.A</h1>
             <button onclick="toggleMenu()" class="md:hidden text-slate-500 text-2xl"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="p-6 space-y-6 overflow-y-auto">
             <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Credenciais</label>
-                <input type="password" id="apiKey" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white outline-none focus:border-brand-500" placeholder="Gemini API Key">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Chave API Gemini</label>
+                <input type="password" id="apiKey" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white outline-none focus:border-brand-500" placeholder="Insira sua chave...">
             </div>
             <div>
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Especialidade</label>
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Especialidade Jurídica</label>
                 <select id="areaDireito" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white">
-                    <option>Direito Civil e Consumidor</option>
-                    <option>Direito de Família</option>
-                    <option>Direito Penal</option>
-                    <option>Direito do Trabalho</option>
+                    <option value="Direito Civil, Imobiliário e Consumidor">Civil, Imobiliário e Consumidor</option>
+                    <option value="Direito de Família e Sucessões">Família e Sucessões</option>
+                    <option value="Direito Penal e Processual Penal">Penal e Processual Penal</option>
+                    <option value="Direito Previdenciário">Previdenciário</option>
+                    <option value="Direito do Trabalho">Trabalho</option>
+                    <option value="Direito Tributário e Empresarial">Tributário e Empresarial</option>
                 </select>
             </div>
-            <div class="pt-6 border-t border-bordercolor">
-                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Assinatura</label>
-                <input type="text" id="advNome" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white mb-2" placeholder="Nome">
-                <input type="text" id="advOAB" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white mb-2" placeholder="OAB">
-                <textarea id="advEndereco" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white resize-none" rows="2" placeholder="Endereço"></textarea>
+            <div class="pt-4 border-t border-bordercolor">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Dados do Juízo</label>
+                <input type="text" id="magistrado" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white mb-2" placeholder="Nome do Juiz/Relator">
+                <input type="text" id="tribunal" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white" placeholder="Vara ou Tribunal">
+            </div>
+            <div class="pt-4 border-t border-bordercolor">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Assinatura Professional</label>
+                <input type="text" id="advNome" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white mb-2" placeholder="Nome do Advogado">
+                <input type="text" id="advOAB" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white mb-2" placeholder="OAB/UF">
+                <textarea id="advEndereco" class="w-full bg-deep border border-bordercolor p-3 rounded-lg text-sm text-white resize-none" rows="2" placeholder="Endereço/Contato"></textarea>
             </div>
         </div>
     </aside>
@@ -66,51 +72,78 @@
         <div class="flex-1 overflow-y-auto p-6 md:p-10">
             <div class="max-w-6xl mx-auto space-y-8">
                 <header>
-                    <h2 class="text-4xl font-serif font-bold text-white italic">Motor de <span class="text-brand-500">Combate Jurídico</span></h2>
-                    <p class="text-slate-400">Extração multimodal, cronologia e análise de vulnerabilidades.</p>
+                    <h2 class="text-4xl font-serif font-bold text-white italic">Motor de <span class="text-brand-500">Inteligência Elite</span></h2>
+                    <p class="text-slate-400">Pesquisa multimodal, Jurimetria e análise estratégica avançada.</p>
                 </header>
 
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div class="lg:col-span-3 glass rounded-2xl p-6">
-                        <textarea id="fatosCaso" rows="8" class="w-full bg-transparent text-lg text-slate-200 outline-none resize-none" placeholder="Relate o caso ou suba arquivos de áudio/vídeo da audiência..."></textarea>
+                        <textarea id="fatosCaso" rows="8" class="w-full bg-transparent text-lg text-slate-200 outline-none resize-none font-serif" placeholder="Relate o caso, cole instruções ou suba mídias da audiência..."></textarea>
                     </div>
                     <div class="lg:col-span-1 flex flex-col gap-4">
                         <div class="flex-1 border-2 border-dashed border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 transition-all" onclick="document.getElementById('arquivos').click()">
                             <input type="file" id="arquivos" multiple accept=".pdf,audio/*,video/*" class="hidden" onchange="updateFileLabel()">
-                            <i class="fa-solid fa-folder-open text-3xl text-slate-600 mb-2"></i>
+                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-600 mb-2"></i>
                             <p class="text-[10px] uppercase font-bold text-slate-500" id="fileLabel">Anexar Autos & Mídia</p>
                         </div>
-                        <button onclick="processar()" class="btn-premium p-5 rounded-2xl font-bold text-white ai-glow">ANÁLISE MULTIMODAL</button>
+                        <button onclick="processar()" class="btn-premium p-5 rounded-2xl font-bold text-white shadow-lg">EXECUTAR ANÁLISE TOTAL</button>
                     </div>
                 </div>
 
                 <div id="loader" class="hidden text-center py-10">
                     <div class="inline-block w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Cruzando depoimentos e autos...</p>
+                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Cruzando dados, juízo e precedentes...</p>
                 </div>
 
-                <div id="results" class="hidden space-y-8">
+                <div id="results" class="hidden space-y-8 pb-20">
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div class="glass rounded-2xl p-6">
-                            <h3 class="text-xs font-black text-brand-500 uppercase mb-6"><i class="fa-solid fa-clock-rotate-left mr-2"></i> Linha do Tempo</h3>
-                            <div id="timelineContainer" class="ml-4 border-l border-slate-700 pl-6 space-y-6 relative"></div>
+                            <h3 class="text-xs font-black text-brand-500 uppercase mb-6"><i class="fa-solid fa-timeline mr-2"></i> Cronologia</h3>
+                            <div id="timeline" class="ml-4 border-l border-slate-700 pl-6 space-y-6 relative"></div>
                         </div>
                         <div class="glass rounded-2xl p-6 border-t-4 border-red-500">
-                            <h3 class="text-xs font-black text-red-500 uppercase mb-6"><i class="fa-solid fa-shield-crack mr-2"></i> Vulnerabilidades Contraparte</h3>
-                            <ul id="vulnerabilidades" class="space-y-4"></ul>
+                            <h3 class="text-xs font-black text-red-500 uppercase mb-6"><i class="fa-solid fa-bolt mr-2"></i> Modo Combate</h3>
+                            <ul id="vulnerabilidades" class="space-y-3"></ul>
                         </div>
-                        <div class="glass rounded-2xl p-6">
-                            <h3 class="text-xs font-black text-emerald-500 uppercase mb-6"><i class="fa-solid fa-bolt mr-2"></i> Parecer Estratégico</h3>
-                            <p id="parecer" class="text-slate-300 text-sm italic leading-relaxed"></p>
+                        <div class="glass rounded-2xl p-6 border-l-4 border-l-purple-500">
+                            <h3 class="text-xs font-black text-purple-500 uppercase mb-6"><i class="fa-solid fa-chart-line mr-2"></i> Jurimetria</h3>
+                            <p id="jurimetria" class="text-sm text-slate-300 italic"></p>
                         </div>
                     </div>
 
-                    <div class="glass rounded-3xl p-8 border border-white/5">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="font-serif text-2xl text-white">Minuta de Alta Performance</h3>
-                            <button onclick="baixarDoc()" class="bg-white text-black px-6 py-2 rounded-lg font-bold text-xs hover:bg-brand-500 hover:text-white transition-all">EXPORTAR WORD</button>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="glass rounded-2xl p-6 border-l-4 border-l-emerald-500">
+                            <h3 class="text-xs font-black text-emerald-500 uppercase mb-4"><i class="fa-solid fa-list-check mr-2"></i> Providências</h3>
+                            <ul id="checklist" class="space-y-2"></ul>
                         </div>
-                        <textarea id="peca" rows="20" class="w-full bg-deep/50 p-6 rounded-2xl text-sm font-serif leading-relaxed text-slate-400 border border-white/5"></textarea>
+                        <div class="glass rounded-2xl p-6 border-l-4 border-l-green-500">
+                            <div class="flex justify-between items-start mb-4">
+                                <h3 class="text-xs font-black text-green-500 uppercase"><i class="fa-brands fa-whatsapp mr-2"></i> Report p/ Cliente</h3>
+                                <button onclick="copyWA()" class="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/20">COPIAR</button>
+                            </div>
+                            <p id="resumo_cliente" class="text-sm text-slate-300 font-sans"></p>
+                        </div>
+                    </div>
+
+                    <div class="glass rounded-3xl overflow-hidden border border-white/5">
+                        <div class="flex border-b border-bordercolor bg-panel/50">
+                            <button onclick="mudarTab('legal')" id="tab-legal" class="flex-1 p-4 text-xs font-black uppercase tab-active">Base Legal</button>
+                            <button onclick="mudarTab('juris')" id="tab-juris" class="flex-1 p-4 text-xs font-black uppercase text-slate-500">Jurisprudência</button>
+                            <button onclick="mudarTab('doutrina')" id="tab-doutrina" class="flex-1 p-4 text-xs font-black uppercase text-slate-500">Doutrina</button>
+                        </div>
+                        <div class="p-8">
+                            <ul id="listaLegal" class="space-y-4"></ul>
+                            <ul id="listaJuris" class="hidden space-y-4"></ul>
+                            <ul id="listaDoutrina" class="hidden space-y-4"></ul>
+                        </div>
+                    </div>
+
+                    <div class="glass rounded-3xl p-8 border border-brand-500/20 shadow-2xl">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="font-serif text-2xl text-white">Minuta Processual Profissional</h3>
+                            <button onclick="baixarDoc()" class="bg-white text-black px-6 py-2 rounded-xl font-bold text-xs hover:bg-brand-500 hover:text-white transition-all">GERAR WORD (.DOCX)</button>
+                        </div>
+                        <textarea id="peca" rows="20" class="w-full bg-deep/50 p-6 rounded-2xl text-sm font-serif leading-relaxed text-slate-400 border border-white/5 outline-none"></textarea>
                     </div>
                 </div>
             </div>
@@ -119,7 +152,17 @@
 
     <script>
         function toggleMenu() { document.getElementById('sidebar').classList.toggle('hidden'); document.getElementById('sidebar').classList.toggle('flex'); }
-        function updateFileLabel() { const c = document.getElementById('arquivos').files.length; document.getElementById('fileLabel').innerText = c + " ARQUIVOS CARREGADOS"; }
+        function updateFileLabel() { const c = document.getElementById('arquivos').files.length; document.getElementById('fileLabel').innerText = c + " ARQUIVOS SELECIONADOS"; }
+
+        function mudarTab(tipo) {
+            ['legal', 'juris', 'doutrina'].forEach(t => {
+                document.getElementById('lista' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
+                document.getElementById('tab-' + t).classList.remove('tab-active');
+                document.getElementById('tab-' + t).classList.add('text-slate-500');
+            });
+            document.getElementById('lista' + tipo.charAt(0).toUpperCase() + tipo.slice(1)).classList.remove('hidden');
+            document.getElementById('tab-' + tipo).classList.add('tab-active');
+        }
 
         async function processar() {
             const apiKey = document.getElementById('apiKey').value;
@@ -132,6 +175,8 @@
             fd.append("api_key", apiKey);
             fd.append("fatos_do_caso", document.getElementById('fatosCaso').value);
             fd.append("area_direito", document.getElementById('areaDireito').value);
+            fd.append("magistrado", document.getElementById('magistrado').value);
+            fd.append("tribunal", document.getElementById('tribunal').value);
             const files = document.getElementById('arquivos').files;
             for(let f of files) fd.append("arquivos", f);
 
@@ -139,31 +184,42 @@
                 const res = await fetch('/analisar', { method: 'POST', body: fd });
                 const d = await res.json();
 
-                document.getElementById('parecer').innerText = d.resumo_estrategico;
+                document.getElementById('jurimetria').innerText = d.jurimetria;
+                document.getElementById('resumo_cliente').innerText = d.resumo_cliente;
                 document.getElementById('peca').value = d.peca_processual;
 
-                // Render Timeline
-                const tc = document.getElementById('timelineContainer');
-                tc.innerHTML = '';
+                // Timeline
+                const tc = document.getElementById('timeline'); tc.innerHTML = '';
                 d.timeline.forEach(t => {
-                    tc.innerHTML += `<div class="timeline-item relative">
-                        <span class="text-[10px] font-bold text-brand-500">${t.data}</span>
-                        <p class="text-xs text-white font-medium">${t.evento}</p>
-                        ${t.alerta ? `<p class="text-[9px] text-red-400 mt-1 italic">⚠️ ${t.alerta}</p>` : ''}
-                    </div>`;
+                    tc.innerHTML += `<div class="timeline-item relative"><span class="text-[10px] font-bold text-brand-500">${t.data}</span><p class="text-xs text-white">${t.evento}</p></div>`;
                 });
 
-                // Render Vulnerabilidades
-                const vc = document.getElementById('vulnerabilidades');
-                vc.innerHTML = '';
+                // Vulnerabilidades
+                const vc = document.getElementById('vulnerabilidades'); vc.innerHTML = '';
                 d.vulnerabilidades_contraparte.forEach(v => {
-                    vc.innerHTML += `<li class="p-3 bg-red-500/5 border border-red-500/20 rounded-lg text-xs text-slate-400"><i class="fa-solid fa-crosshairs text-red-500 mr-2"></i> ${v}</li>`;
+                    vc.innerHTML += `<li class="p-2 bg-red-500/5 border border-red-500/10 rounded text-xs text-slate-400">× ${v}</li>`;
                 });
+
+                // Checklist
+                const cl = document.getElementById('checklist'); cl.innerHTML = '';
+                d.checklist.forEach(c => {
+                    cl.innerHTML += `<li class="flex items-center gap-2 text-xs text-slate-300"><i class="fa-regular fa-square-check text-emerald-500"></i> ${c}</li>`;
+                });
+
+                const carregarL = (lista, id, color) => {
+                    const el = document.getElementById(id); el.innerHTML = '';
+                    (lista || []).forEach(item => { el.innerHTML += `<li class="p-3 bg-white/5 rounded border border-white/5 text-xs text-slate-300 border-l-2 border-${color}-500">${item}</li>`; });
+                };
+                carregarL(d.base_legal, 'listaLegal', 'emerald');
+                carregarL(d.jurisprudencia, 'listaJuris', 'amber');
+                carregarL(d.doutrina, 'listaDoutrina', 'blue');
 
                 document.getElementById('loader').classList.add('hidden');
                 document.getElementById('results').classList.remove('hidden');
-            } catch (e) { alert("Erro no processamento."); document.getElementById('loader').classList.add('hidden'); }
+            } catch (e) { alert("Erro fatal no processamento."); document.getElementById('loader').classList.add('hidden'); }
         }
+
+        function copyWA() { navigator.clipboard.writeText(document.getElementById('resumo_cliente').innerText); alert("Copiado!"); }
 
         async function baixarDoc() {
             const res = await fetch('/gerar_docx', {
@@ -178,7 +234,7 @@
             });
             const b = await res.blob();
             const u = window.URL.createObjectURL(b);
-            const a = document.createElement('a'); a.href = u; a.download = "MA_Elite_Estrategia.docx"; a.click();
+            const a = document.createElement('a'); a.href = u; a.download = "MA_Estrategia_Elite.docx"; a.click();
         }
     </script>
 </body>
