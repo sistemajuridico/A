@@ -24,10 +24,7 @@
         .btn-premium { background: linear-gradient(135deg, #1d4ed8, #3b82f6); box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
         .tab-active { border-bottom: 2px solid #3b82f6; color: white; }
         .timeline-item::before { content: ''; position: absolute; left: -17px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: #3b82f6; border: 2px solid #020617; }
-        
-        @media (max-width: 768px) {
-            #sidebar { width: 100%; max-width: 300px; }
-        }
+        @media (max-width: 768px) { #sidebar { width: 100%; max-width: 300px; } }
     </style>
 </head>
 <body class="flex h-screen antialiased">
@@ -97,12 +94,11 @@
 
                 <div id="loader" class="hidden text-center py-10">
                     <div class="inline-block w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Cruzando dados, juízo e precedentes multimédias...</p>
-                    <p class="text-[10px] text-slate-500 mt-2">Arquivos grandes podem levar até 2 minutos. Não feche esta página.</p>
+                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Inteligência Operando em Backstage...</p>
+                    <p class="text-[11px] text-slate-400 mt-2" id="loaderMsg">O arquivo foi recebido com sucesso. A IA está analisando. Pode demorar alguns minutos.</p>
                 </div>
 
                 <div id="results" class="hidden space-y-8 pb-20">
-                    
                     <div class="glass rounded-2xl p-6 border border-brand-500/30 flex flex-col md:flex-row justify-between items-center bg-brand-500/5 shadow-lg">
                         <div>
                             <h3 class="font-serif text-xl text-white font-bold">Diagnóstico Finalizado</h3>
@@ -168,7 +164,6 @@
     </main>
 
     <script>
-        // Variável global para guardar a análise e permitir o download depois
         let analiseGlobal = null; 
 
         function toggleMenu() { document.getElementById('sidebar').classList.toggle('hidden'); document.getElementById('sidebar').classList.toggle('flex'); }
@@ -188,18 +183,20 @@
         async function processar() {
             const fatos = document.getElementById('fatosCaso').value;
             if (!fatos || fatos.trim().length < 5) {
-                alert("Por favor, descreva os fatos do caso antes de analisar.");
+                alert("Por favor, descreva os fatos do caso.");
                 return;
             }
 
             const btn = document.getElementById('btnExecutar');
             const loader = document.getElementById('loader');
             const results = document.getElementById('results');
+            const loaderMsg = document.getElementById('loaderMsg');
 
             loader.classList.remove('hidden');
             results.classList.add('hidden');
             btn.disabled = true;
             analiseGlobal = null; 
+            loaderMsg.innerText = "Enviando arquivo para o servidor...";
 
             const fd = new FormData();
             fd.append("fatos_do_caso", fatos);
@@ -211,54 +208,93 @@
             for(let f of files) fd.append("arquivos", f);
 
             try {
+                // ETAPA 1: Entrega rápida do arquivo
                 const res = await fetch('/analisar', { method: 'POST', body: fd });
                 
-                if (!res.ok) {
-                    const errorData = await res.json();
-                    throw new Error(errorData.erro || errorData.detail || "Erro de validação ou servidor.");
+                // Trata o erro HTML do Render se o upload em si estourar a rede (muito raro agora)
+                const contentType = res.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    throw new Error("Erro de conexão na entrega do arquivo.");
                 }
 
-                const d = await res.json();
-                analiseGlobal = d; // Guarda os dados para o Dossiê Completo
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.erro || "Erro de servidor.");
+                }
 
-                document.getElementById('jurimetria').innerText = d.jurimetria || "Análise indisponível.";
-                document.getElementById('resumo_cliente').innerText = d.resumo_cliente || "";
-                document.getElementById('peca').value = d.peca_processual || "";
+                const data = await res.json();
+                const taskId = data.task_id;
+                
+                loaderMsg.innerText = "Arquivo recebido! A Inteligência Artificial está cruzando dados. Isso não vai travar...";
 
-                const tc = document.getElementById('timeline'); tc.innerHTML = '';
-                (d.timeline || []).forEach(t => {
-                    tc.innerHTML += `<div class="timeline-item relative">
-                        <span class="text-[10px] font-bold text-brand-500">${t.data}</span>
-                        <p class="text-xs text-white">${t.evento}</p>
-                    </div>`;
-                });
+                // ETAPA 2: Polling (Pergunta ao servidor se já acabou)
+                const checkInterval = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch(`/status/${taskId}`);
+                        const statusData = await statusRes.json();
 
-                const vc = document.getElementById('vulnerabilidades'); vc.innerHTML = '';
-                (d.vulnerabilidades_contraparte || []).forEach(v => {
-                    vc.innerHTML += `<li class="p-3 bg-red-500/5 border border-red-500/10 rounded-lg text-xs text-slate-400">× ${v}</li>`;
-                });
+                        if (statusData.status === "done") {
+                            clearInterval(checkInterval);
+                            renderizarResultados(statusData.resultado);
+                        } else if (statusData.status === "error") {
+                            clearInterval(checkInterval);
+                            alert("Erro na análise da IA: " + statusData.erro);
+                            loader.classList.add('hidden');
+                            btn.disabled = false;
+                        }
+                        // Se for "processing", apenas continua aguardando na próxima volta
+                    } catch (e) {
+                        console.log("Aguardando IA...", e);
+                    }
+                }, 4000); // Checa a cada 4 segundos
 
-                const cl = document.getElementById('checklist'); cl.innerHTML = '';
-                (d.checklist || []).forEach(c => {
-                    cl.innerHTML += `<li class="flex items-center gap-2 text-xs text-slate-300 p-1"><i class="fa-regular fa-square-check text-emerald-500"></i> ${c}</li>`;
-                });
-
-                const carregarL = (lista, id, color) => {
-                    const el = document.getElementById(id); el.innerHTML = '';
-                    (lista || []).forEach(item => { el.innerHTML += `<li class="p-4 bg-white/5 rounded-xl border border-white/5 text-xs text-slate-300 border-l-4 border-${color}-500 leading-relaxed">${item}</li>`; });
-                };
-                carregarL(d.base_legal, 'listaLegal', 'emerald');
-                carregarL(d.jurisprudencia, 'listaJuris', 'amber');
-                carregarL(d.doutrina, 'listaDoutrina', 'blue');
-
-                loader.classList.add('hidden');
-                results.classList.remove('hidden');
             } catch (e) { 
-                alert("Erro ao analisar: " + e.message); 
+                alert("Erro crítico: " + e.message); 
                 loader.classList.add('hidden'); 
-            } finally {
                 btn.disabled = false;
             }
+        }
+
+        function renderizarResultados(d) {
+            const loader = document.getElementById('loader');
+            const results = document.getElementById('results');
+            const btn = document.getElementById('btnExecutar');
+            
+            analiseGlobal = d; 
+
+            document.getElementById('jurimetria').innerText = d.jurimetria || "Análise indisponível.";
+            document.getElementById('resumo_cliente').innerText = d.resumo_cliente || "";
+            document.getElementById('peca').value = d.peca_processual || "";
+
+            const tc = document.getElementById('timeline'); tc.innerHTML = '';
+            (d.timeline || []).forEach(t => {
+                tc.innerHTML += `<div class="timeline-item relative">
+                    <span class="text-[10px] font-bold text-brand-500">${t.data}</span>
+                    <p class="text-xs text-white">${t.evento}</p>
+                </div>`;
+            });
+
+            const vc = document.getElementById('vulnerabilidades'); vc.innerHTML = '';
+            (d.vulnerabilidades_contraparte || []).forEach(v => {
+                vc.innerHTML += `<li class="p-3 bg-red-500/5 border border-red-500/10 rounded-lg text-xs text-slate-400">× ${v}</li>`;
+            });
+
+            const cl = document.getElementById('checklist'); cl.innerHTML = '';
+            (d.checklist || []).forEach(c => {
+                cl.innerHTML += `<li class="flex items-center gap-2 text-xs text-slate-300 p-1"><i class="fa-regular fa-square-check text-emerald-500"></i> ${c}</li>`;
+            });
+
+            const carregarL = (lista, id, color) => {
+                const el = document.getElementById(id); el.innerHTML = '';
+                (lista || []).forEach(item => { el.innerHTML += `<li class="p-4 bg-white/5 rounded-xl border border-white/5 text-xs text-slate-300 border-l-4 border-${color}-500 leading-relaxed">${item}</li>`; });
+            };
+            carregarL(d.base_legal, 'listaLegal', 'emerald');
+            carregarL(d.jurisprudencia, 'listaJuris', 'amber');
+            carregarL(d.doutrina, 'listaDoutrina', 'blue');
+
+            loader.classList.add('hidden');
+            results.classList.remove('hidden');
+            btn.disabled = false;
         }
 
         function copyWA() { 
@@ -278,68 +314,43 @@
 
         async function baixarDossieCompleto() {
             if (!analiseGlobal) return;
+            let tc = "M.A | JUS IA EXPERIENCE - DOSSIÊ ESTRATÉGICO COMPLETO\n\n";
 
-            let textoCompleto = "M.A | JUS IA EXPERIENCE - DOSSIÊ ESTRATÉGICO COMPLETO\n\n";
-
-            if(analiseGlobal.jurimetria) {
-                textoCompleto += "=== JURIMETRIA E TENDÊNCIAS DO JUÍZO ===\n";
-                textoCompleto += analiseGlobal.jurimetria + "\n\n";
+            if(analiseGlobal.jurimetria) tc += "=== JURIMETRIA E TENDÊNCIAS DO JUÍZO ===\n" + analiseGlobal.jurimetria + "\n\n";
+            if(analiseGlobal.resumo_estrategico) tc += "=== RESUMO TÉCNICO ===\n" + analiseGlobal.resumo_estrategico + "\n\n";
+            
+            if(analiseGlobal.timeline?.length) {
+                tc += "=== CRONOLOGIA DO CASO ===\n";
+                analiseGlobal.timeline.forEach(t => tc += `Data: ${t.data} | Evento: ${t.evento}\n`); tc += "\n";
             }
-
-            if(analiseGlobal.resumo_estrategico) {
-                textoCompleto += "=== RESUMO TÉCNICO ===\n";
-                textoCompleto += analiseGlobal.resumo_estrategico + "\n\n";
+            if(analiseGlobal.vulnerabilidades_contraparte?.length) {
+                tc += "=== MODO COMBATE ===\n";
+                analiseGlobal.vulnerabilidades_contraparte.forEach(v => tc += `- ${v}\n`); tc += "\n";
             }
-
-            if(analiseGlobal.timeline && analiseGlobal.timeline.length > 0) {
-                textoCompleto += "=== CRONOLOGIA DO CASO ===\n";
-                analiseGlobal.timeline.forEach(t => { textoCompleto += `Data: ${t.data} | Evento: ${t.evento}\n`; });
-                textoCompleto += "\n";
+            if(analiseGlobal.checklist?.length) {
+                tc += "=== PROVIDÊNCIAS ===\n";
+                analiseGlobal.checklist.forEach(c => tc += `- ${c}\n`); tc += "\n";
             }
-
-            if(analiseGlobal.vulnerabilidades_contraparte && analiseGlobal.vulnerabilidades_contraparte.length > 0) {
-                textoCompleto += "=== MODO COMBATE (VULNERABILIDADES DA CONTRAPARTE) ===\n";
-                analiseGlobal.vulnerabilidades_contraparte.forEach(v => { textoCompleto += `- ${v}\n`; });
-                textoCompleto += "\n";
+            if(analiseGlobal.base_legal?.length) {
+                tc += "=== BASE LEGAL ===\n";
+                analiseGlobal.base_legal.forEach(b => tc += `- ${b}\n`); tc += "\n";
             }
-
-            if(analiseGlobal.checklist && analiseGlobal.checklist.length > 0) {
-                textoCompleto += "=== PROVIDÊNCIAS (CHECKLIST) ===\n";
-                analiseGlobal.checklist.forEach(c => { textoCompleto += `- ${c}\n`; });
-                textoCompleto += "\n";
+            if(analiseGlobal.jurisprudencia?.length) {
+                tc += "=== JURISPRUDÊNCIA APLICÁVEL ===\n";
+                analiseGlobal.jurisprudencia.forEach(j => tc += `- ${j}\n`); tc += "\n";
             }
-
-            if(analiseGlobal.base_legal && analiseGlobal.base_legal.length > 0) {
-                textoCompleto += "=== BASE LEGAL ===\n";
-                analiseGlobal.base_legal.forEach(b => { textoCompleto += `- ${b}\n`; });
-                textoCompleto += "\n";
+            if(analiseGlobal.doutrina?.length) {
+                tc += "=== REFERÊNCIAS DOUTRINÁRIAS ===\n";
+                analiseGlobal.doutrina.forEach(d => tc += `- ${d}\n`); tc += "\n";
             }
+            if(analiseGlobal.peca_processual) tc += "=== MINUTA DA PEÇA PROCESSUAL ===\n" + analiseGlobal.peca_processual + "\n\n";
 
-            if(analiseGlobal.jurisprudencia && analiseGlobal.jurisprudencia.length > 0) {
-                textoCompleto += "=== JURISPRUDÊNCIA APLICÁVEL ===\n";
-                analiseGlobal.jurisprudencia.forEach(j => { textoCompleto += `- ${j}\n`; });
-                textoCompleto += "\n";
-            }
-
-            if(analiseGlobal.doutrina && analiseGlobal.doutrina.length > 0) {
-                textoCompleto += "=== REFERÊNCIAS DOUTRINÁRIAS ===\n";
-                analiseGlobal.doutrina.forEach(d => { textoCompleto += `- ${d}\n`; });
-                textoCompleto += "\n";
-            }
-
-            if(analiseGlobal.peca_processual) {
-                textoCompleto += "=== MINUTA DA PEÇA PROCESSUAL ===\n";
-                textoCompleto += analiseGlobal.peca_processual + "\n\n";
-            }
-
-            const payload = {
-                texto_peca: textoCompleto,
+            enviarParaServidorWord({
+                texto_peca: tc,
                 advogado_nome: document.getElementById('advNome').value,
                 advogado_oab: document.getElementById('advOAB').value,
                 advogado_endereco: document.getElementById('advEndereco').value
-            };
-
-            enviarParaServidorWord(payload, "MA_Dossie_Estrategico_Completo.docx");
+            }, "MA_Dossie_Estrategico_Completo.docx");
         }
 
         async function enviarParaServidorWord(payload, nomeArquivo) {
