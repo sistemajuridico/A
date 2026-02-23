@@ -77,6 +77,7 @@ async def analisar_caso(
         api_key = os.getenv("GEMINI_API_KEY")
         
         if not api_key:
+            print("--- ERRO CRÍTICO ---: Variável GEMINI_API_KEY não encontrada no Render.")
             return JSONResponse(content={"erro": "Chave API não configurada no servidor Render."}, status_code=500)
 
         conteudos_multimais = []
@@ -144,12 +145,13 @@ async def analisar_caso(
         prompt_partes = [f"{instrucoes_sistema}\n\nAUTOS:\n{texto_autos}\n\nFATOS:\n{fatos_do_caso}"]
         prompt_partes.extend(conteudos_multimais)
 
+        # MUDANÇA PARA 1.5 FLASH PARA ESTABILIDADE TOTAL
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-1.5-flash',
             contents=prompt_partes,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                temperature=0.2,
+                temperature=0.1,
                 tools=[{"google_search": {}}]
             )
         )
@@ -157,6 +159,8 @@ async def analisar_caso(
         return JSONResponse(content=json.loads(response.text))
 
     except Exception as e:
+        # DIAGNÓSTICO PARA LOGS DO RENDER
+        print(f"--- ERRO DETECTADO NO M.A ---: {str(e)}")
         return JSONResponse(content={"erro": str(e)}, status_code=500)
 
 # --- GERADOR DE WORD PROFISSIONAL ---
@@ -170,6 +174,7 @@ class DadosPeca(BaseModel):
 @app.post("/gerar_docx")
 async def gerar_docx(dados: DadosPeca):
     doc = docx.Document()
+    # Configuração de Margens de Tribunal
     for s in doc.sections:
         s.top_margin, s.bottom_margin = Cm(3), Cm(2)
         s.left_margin, s.right_margin = Cm(3), Cm(2)
