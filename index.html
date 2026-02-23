@@ -95,7 +95,7 @@
                 <div id="loader" class="hidden text-center py-10">
                     <div class="inline-block w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
                     <p class="mt-4 text-brand-500 font-bold animate-pulse">Inteligência Operando em Backstage...</p>
-                    <p class="text-[11px] text-slate-400 mt-2" id="loaderMsg">O arquivo foi recebido com sucesso. A IA está analisando. Pode demorar alguns minutos.</p>
+                    <p class="text-[11px] text-slate-400 mt-2" id="loaderMsg">O ficheiro foi recebido com sucesso. A IA está a analisar. Pode demorar alguns minutos.</p>
                 </div>
 
                 <div id="results" class="hidden space-y-8 pb-20">
@@ -187,6 +187,19 @@
                 return;
             }
 
+            // --- PROTEÇÃO DO LADO DO CLIENTE (FRONTEND) ---
+            // Verifica o tamanho dos ficheiros antes de os enviar (Limite 50MB)
+            const MAX_SIZE = 50 * 1024 * 1024; // 50MB em bytes
+            const arquivosInput = document.getElementById('arquivos').files;
+            
+            for (let i = 0; i < arquivosInput.length; i++) {
+                if (arquivosInput[i].size > MAX_SIZE) {
+                    alert(`O ficheiro "${arquivosInput[i].name}" é muito grande. O limite máximo permitido é de 50MB.`);
+                    return; // Aborta o envio se exceder o tamanho
+                }
+            }
+            // ------------------------------------------------
+
             const btn = document.getElementById('btnExecutar');
             const loader = document.getElementById('loader');
             const results = document.getElementById('results');
@@ -196,7 +209,7 @@
             results.classList.add('hidden');
             btn.disabled = true;
             analiseGlobal = null; 
-            loaderMsg.innerText = "Enviando arquivo para o servidor...";
+            loaderMsg.innerText = "A enviar ficheiros para o servidor...";
 
             const fd = new FormData();
             fd.append("fatos_do_caso", fatos);
@@ -204,28 +217,34 @@
             fd.append("magistrado", document.getElementById('magistrado').value || "");
             fd.append("tribunal", document.getElementById('tribunal').value || "");
             
-            const files = document.getElementById('arquivos').files;
-            for(let f of files) fd.append("arquivos", f);
+            for(let f of arquivosInput) fd.append("arquivos", f);
 
             try {
                 // ETAPA 1: Entrega rápida do arquivo
                 const res = await fetch('/analisar', { method: 'POST', body: fd });
                 
-                // Trata o erro HTML do Render se o upload em si estourar a rede (muito raro agora)
+                // Trata o erro de tamanho estourado que venha do backend e outros erros HTTP
+                if (!res.ok) {
+                    if (res.status === 413) {
+                        throw new Error("O ficheiro enviado excede o limite máximo permitido pelo servidor (50MB).");
+                    }
+                    try {
+                        const errorData = await res.json();
+                        throw new Error(errorData.erro || "Erro de servidor.");
+                    } catch (errJson) {
+                        throw new Error(`Erro no servidor (Status: ${res.status}).`);
+                    }
+                }
+
                 const contentType = res.headers.get("content-type");
                 if (!contentType || !contentType.includes("application/json")) {
                     throw new Error("Erro de conexão na entrega do arquivo.");
                 }
 
-                if (!res.ok) {
-                    const errorData = await res.json();
-                    throw new Error(errorData.erro || "Erro de servidor.");
-                }
-
                 const data = await res.json();
                 const taskId = data.task_id;
                 
-                loaderMsg.innerText = "Arquivo recebido! A Inteligência Artificial está cruzando dados. Isso não vai travar...";
+                loaderMsg.innerText = "Ficheiros recebidos! A Inteligência Artificial está a cruzar os dados. Isto não vai travar...";
 
                 // ETAPA 2: Polling (Pergunta ao servidor se já acabou)
                 const checkInterval = setInterval(async () => {
@@ -244,12 +263,12 @@
                         }
                         // Se for "processing", apenas continua aguardando na próxima volta
                     } catch (e) {
-                        console.log("Aguardando IA...", e);
+                        console.log("A aguardar IA...", e);
                     }
                 }, 4000); // Checa a cada 4 segundos
 
             } catch (e) { 
-                alert("Erro crítico: " + e.message); 
+                alert("Falha no processo: " + e.message); 
                 loader.classList.add('hidden'); 
                 btn.disabled = false;
             }
@@ -364,7 +383,7 @@
                 const b = await res.blob();
                 const u = window.URL.createObjectURL(b);
                 const a = document.createElement('a'); a.href = u; a.download = nomeArquivo; a.click();
-            } catch(e) { alert("Erro ao gerar o arquivo Word."); }
+            } catch(e) { alert("Erro ao gerar o ficheiro Word."); }
         }
     </script>
 </body>
