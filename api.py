@@ -87,7 +87,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # INSTRUÇÃO ATUALIZADA: ADICIONADA REGRA DE TAMANHO PARA EVITAR CORTE
+        # INSTRUÇÃO ATUALIZADA: REGRA DE TAMANHO AGRESSIVA PARA EVITAR CORTE
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         
@@ -104,7 +104,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         - O campo 'peca_processual' DEVE SER UM ARRAY DE STRINGS (uma lista).
         - Cada parágrafo DEVE ser um item separado na lista.
         - NUNCA use aspas duplas (" ") dentro do texto das suas respostas, substitua SEMPRE por aspas simples (' ').
-        - AVISO CRÍTICO: SEJA CONCISO NA PEÇA PROCESSUAL! Limite a peça aos parágrafos essenciais. Se você escrever demais, o sistema vai cortar a sua resposta e gerar um erro fatal.
+        - LIMITAÇÃO DE TOKENS ATIVADA: A sua petição deve ser SINTÉTICA e DIRETA. Foque apenas no mérito incontestável. Resuma-se a no máximo 20 parágrafos totais. Não crie uma tese infinita, ou a sua resposta será invalidada pelo sistema.
         """
         
         prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia e redija a NOVA peça baseada nestes direcionamentos."
@@ -171,19 +171,22 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             
         texto_puro = texto_puro.strip()
         
-        # O "PARAQUEDAS" DO JSON: Lida com cortes na resposta
+        # O "PARAQUEDAS" DO JSON APRIMORADO
         try:
             dados_json = json.loads(texto_puro, strict=False)
-        except json.JSONDecodeError as e:
-            # Tenta fechar as aspas, a lista e o objeto final na marra caso tenha sido cortado
+        except json.JSONDecodeError:
             try:
-                texto_salvavidas = texto_puro
-                if not texto_salvavidas.endswith('"'):
-                    texto_salvavidas += '"'
-                texto_salvavidas += ']}'
-                dados_json = json.loads(texto_salvavidas, strict=False)
-            except:
-                raise Exception("A IA gerou um texto demasiadamente longo e a resposta foi cortada no meio pelos servidores da Google. Tente resumir os fatos ou anexar um PDF menor para a análise.")
+                # Se o Google cortou o texto no meio, procuramos a última aspa (") 
+                # e fechamos a estrutura inteira na marra para não perder o que já foi gerado.
+                ultimo_indice_aspa = texto_puro.rfind('"')
+                if ultimo_indice_aspa != -1:
+                    # Corta exatamente na última aspa aberta e adiciona o fechamento correto do JSON
+                    texto_salvavidas = texto_puro[:ultimo_indice_aspa] + '"]}'
+                    dados_json = json.loads(texto_salvavidas, strict=False)
+                else:
+                    raise ValueError("JSON irrecuperável")
+            except Exception:
+                raise Exception("A IA gerou uma petição processual que excedeu o teto máximo de processamento da Google. Tente incluir uma instrução nos fatos pedindo que a IA seja mais breve na peça.")
         
         if isinstance(dados_json.get('peca_processual'), list):
             dados_json['peca_processual'] = '\n\n'.join(dados_json['peca_processual'])
