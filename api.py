@@ -14,7 +14,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
-# --- SCHEMAS PYDANTIC ---
+# --- SCHEMAS PYDANTIC (SEM A PEÇA PROCESSUAL) ---
 class SchemaTimeline(BaseModel):
     data: str
     evento: str
@@ -29,7 +29,6 @@ class SchemaRespostaIA(BaseModel):
     base_legal: List[str]
     jurisprudencia: List[str]
     doutrina: List[str]
-    peca_processual: List[str]
 
 app = FastAPI()
 
@@ -87,27 +86,26 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # INSTRUÇÃO ATUALIZADA: REGRA DE TAMANHO AGRESSIVA PARA EVITAR CORTE
+        # INSTRUÇÃO FOCADA APENAS NA ANÁLISE ESTRATÉGICA
         instrucao_sistema = f"""
-        Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
+        Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite, Doutrinador e Estrategista. Especialidade: {area}.
         
-        REGRA DE OURO E INEGOCIÁVEL: O documento PDF enviado é APENAS MATERIAL DE CONSULTA.
-        VOCÊ ESTÁ TERMINANTEMENTE PROIBIDO DE COPIAR OU TRANSCREVER PEÇAS EXISTENTES NO PDF.
-
+        Sua missão é atuar como uma inteligência de retaguarda. O documento PDF enviado é seu material de consulta.
+        
         ARQUITETURA DE PENSAMENTO (SIGA ESTA ORDEM):
         1. Leia o PDF e extraia os fatos crus.
-        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte'.
-        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
-        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, usando as teses mapeadas.
+        2. Analise profundamente o caso e preencha o 'resumo_estrategico'.
+        3. Identifique cronologicamente a 'timeline'.
+        4. Aponte as 'vulnerabilidades_contraparte' (modo combate).
+        5. Sugira a 'base_legal', 'jurisprudencia' e 'doutrina' aplicáveis.
+        6. Crie um 'checklist' de providências e um 'resumo_cliente' didático.
+        7. Preencha a 'jurimetria' com base no comportamento esperado do juízo indicado.
 
-        REGRA ABSOLUTA DE FORMATAÇÃO E TAMANHO (ANTI-ERRO JSON):
-        - O campo 'peca_processual' DEVE SER UM ARRAY DE STRINGS (uma lista).
-        - Cada parágrafo DEVE ser um item separado na lista.
+        REGRA DE FORMATAÇÃO:
         - NUNCA use aspas duplas (" ") dentro do texto das suas respostas, substitua SEMPRE por aspas simples (' ').
-        - LIMITAÇÃO DE TOKENS ATIVADA: A sua petição deve ser SINTÉTICA e DIRETA. Foque apenas no mérito incontestável. Resuma-se a no máximo 20 parágrafos totais. Não crie uma tese infinita, ou a sua resposta será invalidada pelo sistema.
         """
         
-        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia e redija a NOVA peça baseada nestes direcionamentos."
+        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nAnalise detalhadamente o caso e gere o dossiê estratégico baseado nestes direcionamentos."
 
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
@@ -136,7 +134,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         max_tentativas = 3
         response = None
-        erro_final = ""
         
         for tentativa in range(max_tentativas):
             try:
@@ -148,18 +145,14 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 break 
             except Exception as e:
                 erro_atual = str(e)
-                erro_final = erro_atual
                 if ("503" in erro_atual or "429" in erro_atual or "timed out" in erro_atual.lower()) and tentativa < max_tentativas - 1:
                     time.sleep(5)
                     continue
                 else:
-                    raise Exception(f"Falha na IA após {tentativa + 1} tentativas. Erro original: {erro_atual}")
+                    raise Exception(f"Falha na conexão com a IA: {erro_atual}")
 
         if getattr(response, 'text', None) is None:
-            motivo = "A Google bloqueou a resposta silenciosamente."
-            if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
-                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial: {response.candidates[0].finish_reason}"
-            raise Exception(motivo)
+            raise Exception("A IA recusou-se a gerar o texto. Verifique se o conteúdo infringe as políticas da Google.")
 
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
@@ -171,31 +164,13 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             
         texto_puro = texto_puro.strip()
         
-        # O "PARAQUEDAS" DO JSON APRIMORADO
-        try:
-            dados_json = json.loads(texto_puro, strict=False)
-        except json.JSONDecodeError:
-            try:
-                # Se o Google cortou o texto no meio, procuramos a última aspa (") 
-                # e fechamos a estrutura inteira na marra para não perder o que já foi gerado.
-                ultimo_indice_aspa = texto_puro.rfind('"')
-                if ultimo_indice_aspa != -1:
-                    # Corta exatamente na última aspa aberta e adiciona o fechamento correto do JSON
-                    texto_salvavidas = texto_puro[:ultimo_indice_aspa] + '"]}'
-                    dados_json = json.loads(texto_salvavidas, strict=False)
-                else:
-                    raise ValueError("JSON irrecuperável")
-            except Exception:
-                raise Exception("A IA gerou uma petição processual que excedeu o teto máximo de processamento da Google. Tente incluir uma instrução nos fatos pedindo que a IA seja mais breve na peça.")
-        
-        if isinstance(dados_json.get('peca_processual'), list):
-            dados_json['peca_processual'] = '\n\n'.join(dados_json['peca_processual'])
+        dados_json = json.loads(texto_puro, strict=False)
 
         TASKS[task_id] = {"status": "done", "resultado": dados_json}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
-        TASKS[task_id] = {"status": "error", "erro": f"Erro interno ou formatação corrompida: {erro_seguro}"}
+        TASKS[task_id] = {"status": "error", "erro": f"Erro interno na análise: {erro_seguro}"}
     finally:
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
@@ -243,7 +218,7 @@ async def analisar_caso(
                 arquivos_brutos.append((temp_input, ext, safe_name))
                 
     except Exception as e:
-        return JSONResponse(content={"erro": "Erro de codificação ao salvar o arquivo."}, status_code=500)
+        return JSONResponse(content={"erro": "Erro ao salvar o arquivo."}, status_code=500)
 
     background_tasks.add_task(processar_background, task_id, fatos_limpos, area_direito, mag_limpo, trib_limpo, arquivos_brutos)
     
@@ -285,6 +260,6 @@ def gerar_docx(dados: DadosPeca):
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
-        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
+        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Dossie_Estrategico.docx"})
     except Exception as e:
         return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
