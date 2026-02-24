@@ -66,7 +66,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             TASKS[task_id] = {"status": "error", "erro": "Chave API não configurada."}
             return
 
-        # AUMENTO DE TIMEOUT CORRETO: 600.000 milissegundos = 10 Minutos
         client = genai.Client(
             api_key=api_key,
             http_options=types.HttpOptions(timeout=600000) 
@@ -88,6 +87,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
+        # INSTRUÇÃO ATUALIZADA: ADICIONADA REGRA DE TAMANHO PARA EVITAR CORTE
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         
@@ -100,10 +100,11 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
         4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, usando as teses mapeadas.
 
-        REGRA ABSOLUTA DE FORMATAÇÃO (ANTI-ERRO JSON):
+        REGRA ABSOLUTA DE FORMATAÇÃO E TAMANHO (ANTI-ERRO JSON):
         - O campo 'peca_processual' DEVE SER UM ARRAY DE STRINGS (uma lista).
-        - Cada parágrafo, título ou linha da sua petição DEVE ser um item separado na lista.
+        - Cada parágrafo DEVE ser um item separado na lista.
         - NUNCA use aspas duplas (" ") dentro do texto das suas respostas, substitua SEMPRE por aspas simples (' ').
+        - AVISO CRÍTICO: SEJA CONCISO NA PEÇA PROCESSUAL! Limite a peça aos parágrafos essenciais. Se você escrever demais, o sistema vai cortar a sua resposta e gerar um erro fatal.
         """
         
         prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia e redija a NOVA peça baseada nestes direcionamentos."
@@ -133,7 +134,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             
         config_ia = types.GenerateContentConfig(**config_ia_kwargs)
 
-        # LÓGICA DE RETENTATIVAS (RETRY) MANTENDO O SEU MODELO ORIGINAL
         max_tentativas = 3
         response = None
         erro_final = ""
@@ -145,11 +145,10 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                     contents=prompt_partes,
                     config=config_ia
                 )
-                break # Deu certo, sai do loop
+                break 
             except Exception as e:
                 erro_atual = str(e)
                 erro_final = erro_atual
-                # Se for erro 503 (Unavailable), 429 (Rate Limit) ou Timeout de leitura e não for a última tentativa, espera e tenta de novo
                 if ("503" in erro_atual or "429" in erro_atual or "timed out" in erro_atual.lower()) and tentativa < max_tentativas - 1:
                     time.sleep(5)
                     continue
@@ -172,7 +171,19 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             
         texto_puro = texto_puro.strip()
         
-        dados_json = json.loads(texto_puro, strict=False)
+        # O "PARAQUEDAS" DO JSON: Lida com cortes na resposta
+        try:
+            dados_json = json.loads(texto_puro, strict=False)
+        except json.JSONDecodeError as e:
+            # Tenta fechar as aspas, a lista e o objeto final na marra caso tenha sido cortado
+            try:
+                texto_salvavidas = texto_puro
+                if not texto_salvavidas.endswith('"'):
+                    texto_salvavidas += '"'
+                texto_salvavidas += ']}'
+                dados_json = json.loads(texto_salvavidas, strict=False)
+            except:
+                raise Exception("A IA gerou um texto demasiadamente longo e a resposta foi cortada no meio pelos servidores da Google. Tente resumir os fatos ou anexar um PDF menor para a análise.")
         
         if isinstance(dados_json.get('peca_processual'), list):
             dados_json['peca_processual'] = '\n\n'.join(dados_json['peca_processual'])
