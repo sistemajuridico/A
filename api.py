@@ -104,42 +104,42 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # DATA ATUAL PARA FORÇAR O PRESENTE
+        # Injeta a data atual para garantir que a IA se situe no tempo
         hoje = datetime.now().strftime("%d/%m/%Y")
 
-        # ARQUITETURA DA MENTE: ANÁLISE -> ESTRATÉGIA -> REDAÇÃO INÉDITA
+        # ARQUITETURA DE RACIOCÍNIO ENCADEADO
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, Advogado de Elite ({area}). 
-        DATA DE HOJE: {hoje}.
+        ESTAMOS NO PRESENTE, DIA: {hoje}.
 
-        PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
-        1. ANÁLISE TÉCNICA: Identifique todas as nulidades e fraquezas no PDF.
-        2. ESTRATÉGIA: Selecione a jurisprudência e leis que rebatem os pontos do PDF.
-        3. REDAÇÃO FINAL: Escreva uma petição NOVA, do zero, usando os pontos que você acabou de analisar.
+        Siga rigorosamente este fluxo de pensamento:
+        1. INVESTIGAÇÃO: Varra o PDF em busca de nulidades, erros da contraparte e omissões.
+        2. ESTRATÉGIA: Defina a base legal e jurisprudencial que anula os pontos encontrados no PDF.
+        3. REDAÇÃO: Escreva uma petição INÉDITA usando os argumentos dos passos 1 e 2.
 
-        REGRAS CRÍTICAS:
-        - PROIBIDO copiar ou imitar as petições antigas do PDF.
-        - PROIBIDO usar nomes de advogados que constam no PDF. Assine "[NOME DO ADVOGADO]".
-        - A 'peca_processual' deve ser completa e extensa, ignorando o passado e focando na tese nova.
+        REGRAS DE OURO:
+        - É PROIBIDO copiar ou imitar peças anteriores do PDF. O PDF serve apenas como alvo para ser atacado.
+        - Utilize a jurisprudência listada no campo "jurisprudencia" dentro do corpo da "peca_processual".
+        - Assine apenas como "[NOME DO ADVOGADO] - [OAB]". Nunca use nomes do passado.
 
-        RETORNE APENAS O JSON:
+        RETORNE EM JSON:
         {{
-            "resumo_estrategico": "...",
-            "jurimetria": "...",
+            "resumo_estrategico": "...", 
+            "jurimetria": "...", 
             "resumo_cliente": "...",
-            "timeline": [],
-            "vulnerabilidades_contraparte": [],
+            "timeline": [], 
+            "vulnerabilidades_contraparte": [], 
             "checklist": [],
-            "base_legal": [],
-            "jurisprudencia": [],
-            "doutrina": [],
-            "peca_processual": "TEXTO DA NOVA PETIÇÃO AQUI..."
+            "base_legal": [], 
+            "jurisprudencia": [], 
+            "doutrina": [], 
+            "peca_processual": "TEXTO DA NOVA PETIÇÃO INTEGRAL E PRONTA PARA USO..."
         }}
         """
         
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
-        prompt_partes.append(f"{instrucoes}\n\nREQUISITO DO USUÁRIO:\n{fatos}")
+        prompt_partes.append(f"{instrucoes}\n\nFATOS NOVOS E PEDIDO DO CLIENTE:\n{fatos}")
 
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
@@ -148,22 +148,21 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
-        # Configurações otimizadas para não quebrar o JSON
+        # Mantendo exatamente as configurações que você validou como funcionais
         config_ia = types.GenerateContentConfig(
             temperature=0.1,
-            max_output_tokens=8192,
             response_mime_type="application/json",
             safety_settings=filtros_seguranca
         )
 
         response = client.models.generate_content(
-            model='gemini-2.0-flash', 
+            model='gemini-1.5-flash', 
             contents=prompt_partes,
             config=config_ia
         )
 
-        if not response.text:
-            raise Exception("Resposta vazia da IA.")
+        if getattr(response, 'text', None) is None:
+            raise Exception("Erro na geração de conteúdo.")
 
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
@@ -174,7 +173,8 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
 
     except Exception as e:
-        TASKS[task_id] = {"status": "error", "erro": str(e)}
+        erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
+        TASKS[task_id] = {"status": "error", "erro": f"{erro_seguro}"}
     finally:
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
@@ -196,21 +196,31 @@ async def analisar_caso(
     TASKS[task_id] = {"status": "processing"}
 
     arquivos_brutos = []
-    if arquivos:
-        for arquivo in arquivos:
-            if not arquivo.filename: continue
-            ext = arquivo.filename.lower().split('.')[-1]
-            temp_input = f"temp_{uuid.uuid4().hex}.{ext}"
-            with open(temp_input, "wb") as buffer:
-                shutil.copyfileobj(arquivo.file, buffer)
-            arquivos_brutos.append((temp_input, ext, arquivo.filename))
+    try:
+        if arquivos:
+            for arquivo in arquivos:
+                if not arquivo.filename: continue
+                ext = arquivo.filename.lower().split('.')[-1]
+                safe_name = f"doc_{uuid.uuid4().hex}.{ext}"
+                temp_input = f"temp_in_{safe_name}"
+                with open(temp_input, "wb") as buffer:
+                    while True:
+                        chunk = await arquivo.read(1024 * 1024)
+                        if not chunk: break
+                        buffer.write(chunk)
+                arquivos_brutos.append((temp_input, ext, safe_name))
+    except Exception as e:
+        return JSONResponse(content={"erro": "Erro ao salvar arquivos."}, status_code=500)
 
     background_tasks.add_task(processar_background, task_id, fatos_limpos, area_direito, magistrado, tribunal, arquivos_brutos)
     return JSONResponse(content={"task_id": task_id})
 
 @app.get("/status/{task_id}")
 def check_status(task_id: str):
-    return JSONResponse(content=TASKS.get(task_id, {"status": "error", "erro": "ID não encontrado."}))
+    task = TASKS.get(task_id)
+    if not task:
+        return JSONResponse(content={"status": "error", "erro": "Tarefa não encontrada."})
+    return JSONResponse(content=task)
 
 class DadosPeca(BaseModel):
     texto_peca: str
@@ -224,23 +234,20 @@ def gerar_docx(dados: DadosPeca):
         doc = docx.Document()
         for s in doc.sections:
             s.top_margin, s.bottom_margin, s.left_margin, s.right_margin = Cm(3), Cm(2), Cm(3), Cm(2)
-
         if dados.advogado_nome:
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            run_h = p.add_run(f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}")
+            run_h = p.add_run(f"{str(dados.advogado_nome).upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}")
             run_h.font.size, run_h.font.name, run_h.italic = Pt(10), 'Times New Roman', True
-
         for linha in dados.texto_peca.split('\n'):
             if linha.strip():
                 para = doc.add_paragraph(linha.strip())
                 para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
                 para.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
                 para.paragraph_format.first_line_indent = Cm(2.0)
-
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
-        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=Peca_Processual.docx"})
+        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
-        return JSONResponse(content={"erro": str(e)}, status_code=500)
+        return JSONResponse(content={"erro": "Erro no DOCX."}, status_code=500)
