@@ -82,7 +82,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # --- BLINDAGEM MÁXIMA ANTI-ERRO DE JSON APLICADA AQUI ---
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Consultor Estratégico. Especialidade: {area}.
         
@@ -94,11 +93,9 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
         4. O seu objetivo é EXCLUSIVAMENTE fornecer um mapeamento processual, jurimetria e estratégia de combate. NÃO redija minutas processuais.
 
-        REGRAS ABSOLUTAS E FATAIS DE FORMATAÇÃO JSON (SE VOCÊ QUEBRAR, O SISTEMA EXPLODE):
-        - DEVOLVA EXATAMENTE E APENAS UM JSON VÁLIDO. Sem formatação Markdown.
+        REGRAS ABSOLUTAS DE FORMATAÇÃO JSON:
+        - DEVOLVA EXATAMENTE E APENAS UM JSON VÁLIDO.
         - PROIBIDO usar aspas duplas (" ") DENTRO dos seus textos. Troque QUALQUER aspas duplas por aspas simples (' ').
-        - PROIBIDO usar quebras de linha reais (Enter) dentro das strings. Todo texto de um campo deve estar na mesma linha. Se precisar separar parágrafos visualmente, digite os caracteres \\n explicitamente.
-        - NÃO deixe vírgulas sobrando no final de listas.
         """
         
         prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia analítica e preencha os dados no JSON."
@@ -116,7 +113,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         config_ia_kwargs = dict(
             system_instruction=instrucao_sistema,
-            temperature=0.2, # Baixei a temperatura para a IA ficar menos criativa na formatação e mais exata
+            temperature=0.2, 
             max_output_tokens=8192, 
             response_mime_type="application/json",
             response_schema=SchemaRespostaIA, 
@@ -142,7 +139,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         texto_puro = response.text.strip()
         
-        # Limpeza agressiva de backticks caso a IA insista no Markdown
         if texto_puro.startswith("```json"):
             texto_puro = texto_puro[7:]
         elif texto_puro.startswith("```"):
@@ -152,15 +148,18 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             
         texto_puro = texto_puro.strip()
         
-        # Tratamento especial de erro de JSON para exibir exatamente onde a IA errou
+        # --- O ROLO COMPRESSOR (FORÇA BRUTA) ---
+        # Varre todo o texto da resposta e destrói quebras de linha físicas e tabulações, 
+        # transformando o JSON inteiro em uma única linha contínua e inquebrável.
+        texto_puro = texto_puro.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+        
         try:
             dados_json = json.loads(texto_puro, strict=False)
             TASKS[task_id] = {"status": "done", "resultado": dados_json}
         except json.JSONDecodeError as e:
-            # Captura o texto ao redor do erro para nos dizer no alerta exatamente o que causou
             posicao_erro = e.pos
-            recorte_erro = texto_puro[max(0, posicao_erro - 30):posicao_erro + 30]
-            raise Exception(f"A IA corrompeu o texto na seguinte parte: [... {recorte_erro} ...]. Tente rodar a análise novamente.")
+            recorte_erro = texto_puro[max(0, posicao_erro - 40):posicao_erro + 40]
+            raise Exception(f"Erro persistente na formatação gerada pela IA. Trecho: [... {recorte_erro} ...]")
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
