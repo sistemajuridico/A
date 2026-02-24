@@ -1,7 +1,6 @@
 import os
 import io
 import json
-import shutil
 import time
 import uuid
 import unicodedata
@@ -15,7 +14,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
-# --- SCHEMAS PYDANTIC (AGORA COM O TRUQUE DO ARRAY) ---
+# --- SCHEMAS PYDANTIC ---
 class SchemaTimeline(BaseModel):
     data: str
     evento: str
@@ -30,7 +29,7 @@ class SchemaRespostaIA(BaseModel):
     base_legal: List[str]
     jurisprudencia: List[str]
     doutrina: List[str]
-    peca_processual: List[str] # <-- A MÁGICA: A IA vai gerar uma lista de parágrafos
+    peca_processual: List[str]
 
 app = FastAPI()
 
@@ -53,48 +52,13 @@ TASKS = {}
 def serve_index():
     return FileResponse("index.html")
 
-def comprimir_video(input_path, output_path):
-    try:
-        from moviepy.editor import VideoFileClip
-        with VideoFileClip(input_path) as video:
-            video_redimensionado = video.resize(height=480)
-            video_redimensionado.write_videofile(output_path, fps=15, codec="libx264", audio_codec="aac", logger=None)
-        return True
-    except Exception as e:
-        return False
-
-def comprimir_audio(input_path, output_path):
-    try:
-        from pydub import AudioSegment
-        audio = AudioSegment.from_file(input_path)
-        audio = audio.set_channels(1).set_frame_rate(16000)
-        audio.export(output_path, format="mp3", bitrate="64k")
-        return True
-    except Exception as e:
-        return False
-
 def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_brutos: list):
     arquivos_para_gemini = []
     try:
+        # Prepara apenas PDFs
         for temp_input, ext, safe_name in arquivos_brutos:
             target_file = temp_input
             mime = "application/pdf"
-            
-            if ext == "pdf": 
-                mime = "application/pdf"
-            elif ext in ["mp4", "mpeg", "mov", "avi"]:
-                mime = "video/mp4"
-                temp_output = f"comp_{safe_name}"
-                if comprimir_video(temp_input, temp_output):
-                    os.remove(temp_input)
-                    target_file = temp_output
-            elif ext in ["mp3", "wav", "m4a", "ogg"]:
-                mime = "audio/mp3"
-                temp_output = f"comp_{safe_name}"
-                if comprimir_audio(temp_input, temp_output):
-                    os.remove(temp_input)
-                    target_file = temp_output
-                    
             arquivos_para_gemini.append((target_file, mime))
 
         api_key = os.getenv("GEMINI_API_KEY")
@@ -102,7 +66,11 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             TASKS[task_id] = {"status": "error", "erro": "Chave API não configurada."}
             return
 
-        client = genai.Client(api_key=api_key)
+        # AUMENTO DE TIMEOUT: 10 Minutos para evitar que a conexão caia
+        client = genai.Client(
+            api_key=api_key,
+            http_options={'timeout': 600.0} 
+        )
         conteudos_multimais = []
 
         for target_file, mime in arquivos_para_gemini:
@@ -120,7 +88,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # --- A DIRETRIZ SUPREMA (COM BLINDAGEM DE JSON) ---
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         
@@ -166,11 +133,28 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             
         config_ia = types.GenerateContentConfig(**config_ia_kwargs)
 
-        response = client.models.generate_content(
-            model='gemini-2.5-flash', 
-            contents=prompt_partes,
-            config=config_ia
-        )
+        # LÓGICA DE RETENTATIVAS (RETRY) COM O SEU MODELO ORIGINAL
+        max_tentativas = 3
+        response = None
+        erro_final = ""
+        
+        for tentativa in range(max_tentativas):
+            try:
+                response = client.models.generate_content(
+                    model='gemini-2.5-flash', # <-- MANTIDO O SEU MODELO ORIGINAL AQUI
+                    contents=prompt_partes,
+                    config=config_ia
+                )
+                break # Deu certo, sai do loop
+            except Exception as e:
+                erro_atual = str(e)
+                erro_final = erro_atual
+                # Se for erro 503 (Unavailable) ou 429 (Rate Limit) e não for a última tentativa, espera e tenta de novo
+                if ("503" in erro_atual or "429" in erro_atual) and tentativa < max_tentativas - 1:
+                    time.sleep(5)
+                    continue
+                else:
+                    raise Exception(f"Falha na IA após {tentativa + 1} tentativas. Erro original: {erro_atual}")
 
         if getattr(response, 'text', None) is None:
             motivo = "A Google bloqueou a resposta silenciosamente."
@@ -188,11 +172,8 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             
         texto_puro = texto_puro.strip()
         
-        # Leitura tolerante
         dados_json = json.loads(texto_puro, strict=False)
         
-        # --- A RECONSTRUÇÃO DO TEXTO ---
-        # Se a IA cuspiu a petição em formato de lista (parágrafos separados), nós juntamos tudo com quebras de linha aqui!
         if isinstance(dados_json.get('peca_processual'), list):
             dados_json['peca_processual'] = '\n\n'.join(dados_json['peca_processual'])
 
@@ -230,6 +211,11 @@ async def analisar_caso(
             for arquivo in arquivos:
                 if not arquivo.filename: continue
                 ext = arquivo.filename.lower().split('.')[-1]
+                
+                # Ignora se não for PDF
+                if ext != "pdf":
+                    continue
+                    
                 safe_name = f"doc_{uuid.uuid4().hex}.{ext}"
                 temp_input = f"temp_in_{safe_name}"
                 
