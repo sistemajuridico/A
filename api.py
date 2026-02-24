@@ -104,40 +104,43 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # Injeta o tempo real para forçar a atuação no presente
+        # Injeção da data atual para evitar documentos datados do ano passado
         data_hoje = datetime.now().strftime("%d/%m/%Y")
 
-        # O PROMPT DE ELITE: Raciocínio Encadeado (Analisar primeiro, Escrever depois)
+        # NOVA ARQUITETURA DA MENTE: Análise Estratégica -> Armas -> Peça Inédita
         instrucoes = f"""
-        Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
+        Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite. Especialidade: {area}.
+        HOJE É DIA {data_hoje}.
         
-        O PDF anexado representa o PASSADO (o histórico do processo). Você está atuando no PRESENTE (Hoje é {data_hoje}).
+        SUA MISSÃO EM 3 PASSOS:
+        1. ANALISAR: Identifique no PDF as falhas da acusação/contraparte.
+        2. ARMAMENTÁRIO: Liste jurisprudência e leis que aniquilam os argumentos do adversário.
+        3. EXECUTAR: Construa uma PEÇA PROCESSUAL 100% DO ZERO. 
         
-        A SUA MISSÃO SÃO DUAS ETAPAS INTEGRADAS:
-        
-        ETAPA 1: ANÁLISE (Os primeiros campos do JSON)
-        Analise o PDF e os FATOS NOVOS. Identifique as vulnerabilidades da contraparte, a base legal aplicável e a jurisprudência que destrói os argumentos adversos.
-        
-        ETAPA 2: A REDAÇÃO INÉDITA (O campo 'peca_processual')
-        Você DEVE redigir uma PEÇA PROCESSUAL TOTALMENTE NOVA (ex: Réplica, Memoriais, Recurso, etc) que represente o PRÓXIMO PASSO do processo.
-        
-        REGRAS ABSOLUTAS DE REDAÇÃO PARA NÃO SOFRER PENALIZAÇÃO:
-        1. PROIBIÇÃO DE PLÁGIO: É estritamente proibido transcrever ou imitar as petições antigas do PDF. Se você copiar o passado, a missão falha.
-        2. INTEGRAÇÃO DE INTELIGÊNCIA: A sua peça nova DEVE ser construída utilizando obrigatoriamente a base legal, a jurisprudência e as vulnerabilidades que VOCÊ MESMO listou na Etapa 1.
-        3. ASSINATURA CEGA: É proibido usar nomes de advogados que estão no PDF. Assine no final apenas com "[NOME DO ADVOGADO] - [OAB]".
-        
-        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
+        REGRAS INEGOCIÁVEIS:
+        - É PROIBIDO copiar textos, parágrafos ou o estilo das petições antigas que estão no PDF.
+        - Utilize obrigatoriamente as falhas e jurisprudências encontradas nos passos 1 e 2 para escrever a peça do passo 3.
+        - Não use nomes de advogados do PDF. Assine como "[NOME DO ADVOGADO] - [OAB]".
+        - A peça deve ser extensa, formal e completa (Endereçamento, Fatos, Direito, Pedidos).
+
+        RETORNE ESTRITAMENTE EM JSON:
         {{
-            "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
-            "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
-            "base_legal": [], "jurisprudencia": [], "doutrina": [], 
-            "peca_processual": "TEXTO INTEGRAL DA PEÇA INÉDITA. Construa do zero, argumentando de forma letal com base nas teses e jurisprudências que você acabou de levantar nos campos acima."
+            "resumo_estrategico": "...", 
+            "jurimetria": "...", 
+            "resumo_cliente": "...",
+            "timeline": [], 
+            "vulnerabilidades_contraparte": [], 
+            "checklist": [],
+            "base_legal": [], 
+            "jurisprudencia": [], 
+            "doutrina": [], 
+            "peca_processual": "REDAÇÃO DA PEÇA INÉDITA AQUI..."
         }}
         """
         
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
-        prompt_partes.append(f"{instrucoes}\n\nFATOS NOVOS (CRIAR PEÇA NOVA COM BASE NISTO):\n{fatos}")
+        prompt_partes.append(f"{instrucoes}\n\nFATOS NOVOS E PEDIDO DO USUÁRIO:\n{fatos}")
 
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
@@ -146,21 +149,12 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
-        if len(conteudos_multimais) > 0:
-            config_ia = types.GenerateContentConfig(
-                temperature=0.1,
-                max_output_tokens=8192,
-                response_mime_type="application/json",
-                safety_settings=filtros_seguranca
-            )
-        else:
-            config_ia = types.GenerateContentConfig(
-                temperature=0.1, 
-                max_output_tokens=8192,
-                response_mime_type="application/json",
-                tools=[{"googleSearch": {}}],
-                safety_settings=filtros_seguranca
-            )
+        # Mantendo as configurações originais que não quebram o JSON
+        config_ia = types.GenerateContentConfig(
+            temperature=0.1,
+            response_mime_type="application/json",
+            safety_settings=filtros_seguranca
+        )
 
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
@@ -169,10 +163,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         )
 
         if getattr(response, 'text', None) is None:
-            motivo = "A Google bloqueou a resposta silenciosamente."
-            if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
-                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial da Google: {response.candidates[0].finish_reason}"
-            raise Exception(motivo)
+            raise Exception("A IA não gerou resposta. Verifique os filtros de segurança.")
 
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
@@ -180,24 +171,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if texto_puro.endswith("```"):
             texto_puro = texto_puro.rsplit("```", 1)[0]
             
-        # --- A REDE DE PROTEÇÃO CONTRA FALHAS NO JSON (O Plano B) ---
-        try:
-            resultado_final = json.loads(texto_puro.strip())
-        except Exception as erro_json:
-            resultado_final = {
-                "resumo_estrategico": "A IA escreveu um texto gigantesco e perdeu o alinhamento dos painéis, mas o seu documento foi salvo! Role a página até ao fundo.",
-                "jurimetria": "Formatação corrompida. O texto está em baixo.",
-                "resumo_cliente": "Formatação corrompida.",
-                "timeline": [{"data": data_hoje, "evento": "Análise Bruta Concluída"}],
-                "vulnerabilidades_contraparte": ["Recuperação de texto bruto ativada."],
-                "checklist": [],
-                "base_legal": [],
-                "jurisprudencia": [],
-                "doutrina": [],
-                "peca_processual": texto_puro.strip()
-            }
-            
-        TASKS[task_id] = {"status": "done", "resultado": resultado_final}
+        TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
@@ -244,7 +218,7 @@ async def analisar_caso(
                 arquivos_brutos.append((temp_input, ext, safe_name))
                 
     except Exception as e:
-        return JSONResponse(content={"erro": "Erro de codificação ao salvar o arquivo."}, status_code=500)
+        return JSONResponse(content={"erro": "Erro ao processar arquivos."}, status_code=500)
 
     background_tasks.add_task(processar_background, task_id, fatos_limpos, area_direito, mag_limpo, trib_limpo, arquivos_brutos)
     
@@ -254,7 +228,7 @@ async def analisar_caso(
 def check_status(task_id: str):
     task = TASKS.get(task_id)
     if not task:
-        return JSONResponse(content={"status": "error", "erro": "Tarefa perdida."})
+        return JSONResponse(content={"status": "error", "erro": "Tarefa não encontrada."})
     return JSONResponse(content=task)
 
 class DadosPeca(BaseModel):
@@ -286,6 +260,6 @@ def gerar_docx(dados: DadosPeca):
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
-        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
+        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=Minuta_M_A.docx"})
     except Exception as e:
-        return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
+        return JSONResponse(content={"erro": "Erro ao gerar Word."}, status_code=500)
