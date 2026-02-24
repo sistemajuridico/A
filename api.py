@@ -5,6 +5,7 @@ import shutil
 import time
 import uuid
 import unicodedata
+from datetime import datetime
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -103,31 +104,41 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
+        # Injeta o tempo real para forçar a atuação no presente
+        data_hoje = datetime.now().strftime("%d/%m/%Y")
+
+        # O PROMPT DE ELITE: Raciocínio Encadeado (Analisar primeiro, Escrever depois)
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
-        Concentre-se na análise técnica, doutrinária e jurisprudencial.
         
-        REGRA CRÍTICA: É ESTRITAMENTE PROIBIDO copiar ou transcrever as petições antigas do PDF. O PDF é apenas o histórico do caso.
-        O seu trabalho é redigir uma PEÇA NOVA, INÉDITA e com a DATA ATUAL (Ano Corrente), rebatendo o que está no PDF e usando os Fatos Novos.
+        O PDF anexado representa o PASSADO (o histórico do processo). Você está atuando no PRESENTE (Hoje é {data_hoje}).
         
-        ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
-        Você DEVE redigir a NOVA PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
-        Inclua obrigatoriamente: Endereçamento correto, Qualificação completa, Dos Fatos, Do Direito, Dos Pedidos e Fecho formal.
-
+        A SUA MISSÃO SÃO DUAS ETAPAS INTEGRADAS:
+        
+        ETAPA 1: ANÁLISE (Os primeiros campos do JSON)
+        Analise o PDF e os FATOS NOVOS. Identifique as vulnerabilidades da contraparte, a base legal aplicável e a jurisprudência que destrói os argumentos adversos.
+        
+        ETAPA 2: A REDAÇÃO INÉDITA (O campo 'peca_processual')
+        Você DEVE redigir uma PEÇA PROCESSUAL TOTALMENTE NOVA (ex: Réplica, Memoriais, Recurso, etc) que represente o PRÓXIMO PASSO do processo.
+        
+        REGRAS ABSOLUTAS DE REDAÇÃO PARA NÃO SOFRER PENALIZAÇÃO:
+        1. PROIBIÇÃO DE PLÁGIO: É estritamente proibido transcrever ou imitar as petições antigas do PDF. Se você copiar o passado, a missão falha.
+        2. INTEGRAÇÃO DE INTELIGÊNCIA: A sua peça nova DEVE ser construída utilizando obrigatoriamente a base legal, a jurisprudência e as vulnerabilidades que VOCÊ MESMO listou na Etapa 1.
+        3. ASSINATURA CEGA: É proibido usar nomes de advogados que estão no PDF. Assine no final apenas com "[NOME DO ADVOGADO] - [OAB]".
+        
         RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
         {{
             "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
             "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
             "base_legal": [], "jurisprudencia": [], "doutrina": [], 
-            "peca_processual": "TEXTO INTEGRAL E EXTENSO DA NOVA PEÇA AQUI..."
+            "peca_processual": "TEXTO INTEGRAL DA PEÇA INÉDITA. Construa do zero, argumentando de forma letal com base nas teses e jurisprudências que você acabou de levantar nos campos acima."
         }}
         """
         
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
-        prompt_partes.append(f"{instrucoes}\n\nFATOS (CRIAR PEÇA NOVA COM BASE NISTO):\n{fatos}")
+        prompt_partes.append(f"{instrucoes}\n\nFATOS NOVOS (CRIAR PEÇA NOVA COM BASE NISTO):\n{fatos}")
 
-        # --- A VACINA DOS FILTROS (Permite analisar crimes, litígios e afins sem a Google bloquear) ---
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
             types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
@@ -138,12 +149,14 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if len(conteudos_multimais) > 0:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1,
+                max_output_tokens=8192,
                 response_mime_type="application/json",
                 safety_settings=filtros_seguranca
             )
         else:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
+                max_output_tokens=8192,
                 response_mime_type="application/json",
                 tools=[{"googleSearch": {}}],
                 safety_settings=filtros_seguranca
@@ -155,7 +168,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             config=config_ia
         )
 
-        # --- A REDE DE PROTEÇÃO CONTRA O NONETYPE ---
         if getattr(response, 'text', None) is None:
             motivo = "A Google bloqueou a resposta silenciosamente."
             if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
@@ -168,7 +180,24 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if texto_puro.endswith("```"):
             texto_puro = texto_puro.rsplit("```", 1)[0]
             
-        TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
+        # --- A REDE DE PROTEÇÃO CONTRA FALHAS NO JSON (O Plano B) ---
+        try:
+            resultado_final = json.loads(texto_puro.strip())
+        except Exception as erro_json:
+            resultado_final = {
+                "resumo_estrategico": "A IA escreveu um texto gigantesco e perdeu o alinhamento dos painéis, mas o seu documento foi salvo! Role a página até ao fundo.",
+                "jurimetria": "Formatação corrompida. O texto está em baixo.",
+                "resumo_cliente": "Formatação corrompida.",
+                "timeline": [{"data": data_hoje, "evento": "Análise Bruta Concluída"}],
+                "vulnerabilidades_contraparte": ["Recuperação de texto bruto ativada."],
+                "checklist": [],
+                "base_legal": [],
+                "jurisprudencia": [],
+                "doutrina": [],
+                "peca_processual": texto_puro.strip()
+            }
+            
+        TASKS[task_id] = {"status": "done", "resultado": resultado_final}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
