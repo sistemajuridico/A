@@ -15,7 +15,6 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
-# --- SCHEMAS PYDANTIC (AGORA COM O TRUQUE DO ARRAY) ---
 class SchemaTimeline(BaseModel):
     data: str
     evento: str
@@ -30,7 +29,6 @@ class SchemaRespostaIA(BaseModel):
     base_legal: List[str]
     jurisprudencia: List[str]
     doutrina: List[str]
-    peca_processual: List[str] # <-- A MÁGICA: A IA vai gerar uma lista de parágrafos
 
 app = FastAPI()
 
@@ -120,7 +118,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # --- A DIRETRIZ SUPREMA (COM BLINDAGEM DE JSON) ---
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         
@@ -131,15 +128,12 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         1. Leia o PDF e extraia os fatos crus.
         2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte'.
         3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
-        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, usando as teses mapeadas.
 
         REGRA ABSOLUTA DE FORMATAÇÃO (ANTI-ERRO JSON):
-        - O campo 'peca_processual' DEVE SER UM ARRAY DE STRINGS (uma lista).
-        - Cada parágrafo, título ou linha da sua petição DEVE ser um item separado na lista.
         - NUNCA use aspas duplas (" ") dentro do texto das suas respostas, substitua SEMPRE por aspas simples (' ').
         """
         
-        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia e redija a NOVA peça baseada nestes direcionamentos."
+        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia processual baseada nestes direcionamentos."
 
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
@@ -188,13 +182,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             
         texto_puro = texto_puro.strip()
         
-        # Leitura tolerante
         dados_json = json.loads(texto_puro, strict=False)
-        
-        # --- A RECONSTRUÇÃO DO TEXTO ---
-        # Se a IA cuspiu a petição em formato de lista (parágrafos separados), nós juntamos tudo com quebras de linha aqui!
-        if isinstance(dados_json.get('peca_processual'), list):
-            dados_json['peca_processual'] = '\n\n'.join(dados_json['peca_processual'])
 
         TASKS[task_id] = {"status": "done", "resultado": dados_json}
 
