@@ -80,13 +80,13 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div class="lg:col-span-3 glass rounded-2xl p-6">
-                        <textarea id="fatosCaso" rows="8" class="w-full bg-transparent text-lg text-slate-200 outline-none resize-none font-serif" placeholder="Narre o caso, cole instruções ou suba mídias da audiência (áudio/vídeo)..."></textarea>
+                        <textarea id="fatosCaso" rows="10" class="w-full bg-transparent text-lg text-slate-200 outline-none resize-none font-serif" placeholder="Cole o Prompt Gerado pelo Estrategista Local aqui..."></textarea>
                     </div>
                     <div class="lg:col-span-1 flex flex-col gap-4">
                         <div class="flex-1 border-2 border-dashed border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 transition-all" onclick="document.getElementById('arquivos').click()">
-                            <input type="file" id="arquivos" multiple accept=".pdf,audio/*,video/*" class="hidden" onchange="updateFileLabel()">
-                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-600 mb-2"></i>
-                            <p class="text-[10px] uppercase font-bold text-slate-500" id="fileLabel">Anexar Autos & Mídia</p>
+                            <input type="file" id="arquivos" multiple accept=".pdf" class="hidden" onchange="updateFileLabel()">
+                            <i class="fa-solid fa-file-pdf text-3xl text-slate-600 mb-2"></i>
+                            <p class="text-[10px] uppercase font-bold text-slate-500" id="fileLabel">Anexar PDF Comprimido</p>
                         </div>
                         <button id="btnExecutar" onclick="processar()" class="btn-premium p-5 rounded-2xl font-bold text-white shadow-lg disabled:opacity-50">EXECUTAR ANÁLISE TOTAL</button>
                     </div>
@@ -94,15 +94,15 @@
 
                 <div id="loader" class="hidden text-center py-10">
                     <div class="inline-block w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Inteligência Operando em Backstage...</p>
-                    <p class="text-[11px] text-slate-400 mt-2" id="loaderMsg">O ficheiro foi recebido com sucesso. A IA está a analisar. Pode demorar alguns minutos.</p>
+                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Inteligência Operando...</p>
+                    <p class="text-[11px] text-slate-400 mt-2" id="loaderMsg">A processar os dados do Estrategista. Por favor, aguarde.</p>
                 </div>
 
                 <div id="results" class="hidden space-y-8 pb-20">
                     <div class="glass rounded-2xl p-6 border border-brand-500/30 flex flex-col md:flex-row justify-between items-center bg-brand-500/5 shadow-lg">
                         <div>
                             <h3 class="font-serif text-xl text-white font-bold">Diagnóstico Finalizado</h3>
-                            <p class="text-slate-400 text-sm">Visualize os painéis abaixo ou faça o download da análise estratégica completa.</p>
+                            <p class="text-slate-400 text-sm">Estratégia mapeada com sucesso.</p>
                         </div>
                         <button onclick="baixarDossieCompleto()" class="mt-4 md:mt-0 btn-premium px-6 py-3 rounded-xl font-bold text-xs text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] flex items-center gap-2 hover:scale-105 transition-transform">
                             <i class="fa-solid fa-file-word text-lg"></i> BAIXAR DOSSIÊ COMPLETO
@@ -156,7 +156,7 @@
                             <h3 class="font-serif text-2xl text-white">Minuta Processual de Elite</h3>
                             <button onclick="baixarDoc()" class="bg-white text-black px-6 py-3 rounded-xl font-bold text-xs hover:bg-brand-500 hover:text-white transition-all shadow-lg">BAIXAR APENAS PETIÇÃO</button>
                         </div>
-                        <textarea id="peca" rows="20" class="w-full bg-deep/50 p-6 rounded-2xl text-sm font-serif leading-relaxed text-slate-400 border border-white/5 outline-none"></textarea>
+                        <textarea id="peca" rows="25" class="w-full bg-deep/50 p-6 rounded-2xl text-sm font-serif leading-relaxed text-slate-400 border border-white/5 outline-none"></textarea>
                     </div>
                 </div>
             </div>
@@ -182,138 +182,77 @@
 
         async function processar() {
             const fatos = document.getElementById('fatosCaso').value;
-            if (!fatos || fatos.trim().length < 5) {
-                alert("Por favor, descreva os fatos do caso.");
-                return;
-            }
-
-            // LIMITE AUMENTADO PARA 100MB POR FICHEIRO
-            const MAX_SIZE = 100 * 1024 * 1024; 
-            const arquivosInput = document.getElementById('arquivos').files;
-            
-            for (let i = 0; i < arquivosInput.length; i++) {
-                if (arquivosInput[i].size > MAX_SIZE) {
-                    alert(`O ficheiro "${arquivosInput[i].name}" é muito grande. Cada ficheiro deve ter no máximo 100MB.`);
-                    return; 
-                }
-            }
+            if (!fatos || fatos.trim().length < 5) { alert("Por favor, cole o prompt estratégico."); return; }
 
             const btn = document.getElementById('btnExecutar');
             const loader = document.getElementById('loader');
             const results = document.getElementById('results');
-            const loaderMsg = document.getElementById('loaderMsg');
-
+            
             loader.classList.remove('hidden');
             results.classList.add('hidden');
             btn.disabled = true;
-            analiseGlobal = null; 
-            loaderMsg.innerText = "A enviar ficheiros para o servidor...";
 
             const fd = new FormData();
             fd.append("fatos_do_caso", fatos);
-            fd.append("area_direito", document.getElementById('areaDireito').value || "");
-            fd.append("magistrado", document.getElementById('magistrado').value || "");
-            fd.append("tribunal", document.getElementById('tribunal').value || "");
+            fd.append("area_direito", document.getElementById('areaDireito').value);
+            fd.append("magistrado", document.getElementById('magistrado').value);
+            fd.append("tribunal", document.getElementById('tribunal').value);
             
-            for(let f of arquivosInput) fd.append("arquivos", f);
+            for(let f of document.getElementById('arquivos').files) fd.append("arquivos", f);
 
             try {
                 const res = await fetch('/analisar', { method: 'POST', body: fd });
-                
-                if (!res.ok) {
-                    if (res.status === 413) {
-                        throw new Error("A soma de todos os ficheiros excede o limite do servidor (300MB). Tente enviar menos ficheiros de cada vez.");
-                    }
-                    try {
-                        const errorData = await res.json();
-                        throw new Error(errorData.erro || "Erro de servidor.");
-                    } catch (errJson) {
-                        throw new Error(`Erro no servidor (Status: ${res.status}).`);
-                    }
-                }
-
-                const contentType = res.headers.get("content-type");
-                if (!contentType || !contentType.includes("application/json")) {
-                    throw new Error("Erro de conexão na entrega do arquivo.");
-                }
-
                 const data = await res.json();
-                const taskId = data.task_id;
                 
-                loaderMsg.innerText = "Ficheiros recebidos! A Inteligência Artificial está a cruzar os dados. Isto não vai travar...";
-
-                const checkInterval = setInterval(async () => {
-                    try {
-                        const statusRes = await fetch(`/status/${taskId}`);
-                        const statusData = await statusRes.json();
-
-                        if (statusData.status === "done") {
-                            clearInterval(checkInterval);
-                            renderizarResultados(statusData.resultado);
-                        } else if (statusData.status === "error") {
-                            clearInterval(checkInterval);
-                            alert(statusData.erro);
-                            loader.classList.add('hidden');
-                            btn.disabled = false;
-                        }
-                    } catch (e) {
-                        console.log("A aguardar IA...", e);
+                const checkStatus = setInterval(async () => {
+                    const sRes = await fetch(`/status/${data.task_id}`);
+                    const sData = await sRes.json();
+                    if(sData.status === "done") {
+                        clearInterval(checkStatus);
+                        renderizarResultados(sData.resultado);
+                    } else if(sData.status === "error") {
+                        clearInterval(checkStatus);
+                        alert(sData.erro);
+                        loader.classList.add('hidden');
+                        btn.disabled = false;
                     }
                 }, 4000);
-
             } catch (e) { 
-                alert("Falha no processo: " + e.message); 
+                alert("Erro na conexão."); 
                 loader.classList.add('hidden'); 
                 btn.disabled = false;
             }
         }
 
         function renderizarResultados(d) {
-            const loader = document.getElementById('loader');
-            const results = document.getElementById('results');
-            const btn = document.getElementById('btnExecutar');
-            
-            analiseGlobal = d; 
-
-            document.getElementById('jurimetria').innerText = d.jurimetria || "Análise indisponível.";
-            document.getElementById('resumo_cliente').innerText = d.resumo_cliente || "";
-            document.getElementById('peca').value = d.peca_processual || "";
+            analiseGlobal = d;
+            document.getElementById('jurimetria').innerText = d.jurimetria;
+            document.getElementById('resumo_cliente').innerText = d.resumo_cliente;
+            document.getElementById('peca').value = d.peca_processual;
 
             const tc = document.getElementById('timeline'); tc.innerHTML = '';
-            (d.timeline || []).forEach(t => {
-                tc.innerHTML += `<div class="timeline-item relative">
-                    <span class="text-[10px] font-bold text-brand-500">${t.data}</span>
-                    <p class="text-xs text-white">${t.evento}</p>
-                </div>`;
-            });
+            d.timeline.forEach(t => tc.innerHTML += `<div class="timeline-item relative"><span class="text-[10px] font-bold text-brand-500">${t.data}</span><p class="text-xs text-white">${t.evento}</p></div>`);
 
             const vc = document.getElementById('vulnerabilidades'); vc.innerHTML = '';
-            (d.vulnerabilidades_contraparte || []).forEach(v => {
-                vc.innerHTML += `<li class="p-3 bg-red-500/5 border border-red-500/10 rounded-lg text-xs text-slate-400">× ${v}</li>`;
-            });
+            d.vulnerabilidades_contraparte.forEach(v => vc.innerHTML += `<li class="p-3 bg-red-500/5 border border-red-500/10 rounded-lg text-xs text-slate-400">× ${v}</li>`);
 
             const cl = document.getElementById('checklist'); cl.innerHTML = '';
-            (d.checklist || []).forEach(c => {
-                cl.innerHTML += `<li class="flex items-center gap-2 text-xs text-slate-300 p-1"><i class="fa-regular fa-square-check text-emerald-500"></i> ${c}</li>`;
-            });
+            d.checklist.forEach(c => cl.innerHTML += `<li class="flex items-center gap-2 text-xs text-slate-300 p-1"><i class="fa-regular fa-square-check text-emerald-500"></i> ${c}</li>`);
 
             const carregarL = (lista, id, color) => {
                 const el = document.getElementById(id); el.innerHTML = '';
-                (lista || []).forEach(item => { el.innerHTML += `<li class="p-4 bg-white/5 rounded-xl border border-white/5 text-xs text-slate-300 border-l-4 border-${color}-500 leading-relaxed">${item}</li>`; });
+                lista.forEach(item => el.innerHTML += `<li class="p-4 bg-white/5 rounded-xl border border-white/5 text-xs text-slate-300 border-l-4 border-${color}-500">${item}</li>`);
             };
             carregarL(d.base_legal, 'listaLegal', 'emerald');
             carregarL(d.jurisprudencia, 'listaJuris', 'amber');
             carregarL(d.doutrina, 'listaDoutrina', 'blue');
 
-            loader.classList.add('hidden');
-            results.classList.remove('hidden');
-            btn.disabled = false;
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('btnExecutar').disabled = false;
         }
 
-        function copyWA() { 
-            navigator.clipboard.writeText(document.getElementById('resumo_cliente').innerText); 
-            alert("Texto copiado!"); 
-        }
+        function copyWA() { navigator.clipboard.writeText(document.getElementById('resumo_cliente').innerText); alert("Copiado!"); }
 
         async function baixarDoc() {
             const payload = {
@@ -322,7 +261,7 @@
                 advogado_oab: document.getElementById('advOAB').value,
                 advogado_endereco: document.getElementById('advEndereco').value
             };
-            enviarParaServidorWord(payload, "MA_Minuta_Peticional.docx");
+            enviarParaServidorWord(payload, "Minuta_Elite.docx");
         }
 
         async function baixarDossieCompleto() {
@@ -364,21 +303,18 @@
                 advogado_nome: document.getElementById('advNome').value,
                 advogado_oab: document.getElementById('advOAB').value,
                 advogado_endereco: document.getElementById('advEndereco').value
-            }, "MA_Dossie_Estrategico_Completo.docx");
+            }, "Dossie_Estrategico_Completo.docx");
         }
 
-        async function enviarParaServidorWord(payload, nomeArquivo) {
-            try {
-                const res = await fetch('/gerar_docx', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (!res.ok) throw new Error("Erro ao gerar documento.");
-                const b = await res.blob();
-                const u = window.URL.createObjectURL(b);
-                const a = document.createElement('a'); a.href = u; a.download = nomeArquivo; a.click();
-            } catch(e) { alert("Erro ao gerar o ficheiro Word."); }
+        async function enviarParaServidorWord(payload, nome) {
+            const res = await fetch('/gerar_docx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const b = await res.blob();
+            const u = window.URL.createObjectURL(b);
+            const a = document.createElement('a'); a.href = u; a.download = nome; a.click();
         }
     </script>
 </body>
