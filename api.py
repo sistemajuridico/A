@@ -50,6 +50,61 @@ TASKS = {}
 def serve_index():
     return FileResponse("index.html")
 
+# --- O TANQUE DE GUERRA: RECUPERADOR DE JSON ---
+def forca_bruta_json(texto_bruto):
+    texto = texto_bruto.strip()
+    if texto.startswith("```json"): texto = texto[7:]
+    elif texto.startswith("```"): texto = texto[3:]
+    if texto.endswith("```"): texto = texto[:-3]
+    texto = texto.strip()
+    
+    # 1. Limpa quebras de linha acidentais DENTRO das strings (o erro mais comum do Gemini)
+    texto_limpo = ""
+    dentro_string = False
+    escapado = False
+    
+    for char in texto:
+        if char == '\\' and not escapado:
+            escapado = True
+            texto_limpo += char
+            continue
+            
+        if char == '"' and not escapado:
+            dentro_string = not dentro_string
+            texto_limpo += char
+        elif dentro_string and char in ('\n', '\r', '\t'):
+            texto_limpo += ' '  # Troca o "Enter" mortal por um espaço inofensivo
+        else:
+            texto_limpo += char
+            
+        escapado = False
+
+    # 2. Tenta ler o JSON limpo
+    try:
+        return json.loads(texto_limpo, strict=False)
+    except Exception as e:
+        # 3. Se deu erro "Unterminated", a IA parou de digitar no meio. Vamos costurar o final!
+        tentativas_fechamento = ['"}', '"]}', ']}', '}']
+        for f in tentativas_fechamento:
+            try:
+                return json.loads(texto_limpo + f, strict=False)
+            except:
+                pass
+        
+        # 4. SOBREVIVÊNCIA MÁXIMA: Se tudo falhar, devolvemos o texto que foi gerado em formato de alerta
+        # Assim o usuário sempre recebe a análise, e o sistema NUNCA trava.
+        return {
+            "resumo_estrategico": "AVISO DO SISTEMA: A IA fez a análise, mas o volume de texto excedeu o limite estrutural do painel. \n\nTEXTO RECUPERADO DA IA:\n" + texto_limpo[:4000],
+            "jurimetria": "Análise prejudicada pela extensão excessiva do texto.",
+            "resumo_cliente": "Consulte o resumo estratégico para ler os dados crus.",
+            "timeline": [{"data": "ERRO", "evento": "Cronologia não pôde ser montada."}],
+            "vulnerabilidades_contraparte": ["Consulte os dados brutos no resumo."],
+            "checklist": ["Simplifique os fatos ou envie um PDF menor na próxima tentativa."],
+            "base_legal": ["-"],
+            "jurisprudencia": ["-"],
+            "doutrina": ["-"]
+        }
+
 def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_brutos: list):
     arquivos_para_gemini = []
     try:
@@ -82,20 +137,21 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # O prompt agora foca APENAS na análise jurídica. Nada de regras chatas de programação.
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Consultor Estratégico. Especialidade: {area}.
         
         REGRA DE OURO: O documento PDF enviado é APENAS MATERIAL DE CONSULTA.
         
+        SEJA EXTREMAMENTE CONCISO E OBJETIVO: Textos longos quebram a interface. Use listas e respostas curtas (máx 3 parágrafos por campo).
+        
         ARQUITETURA DE PENSAMENTO:
-        1. Leia o PDF e extraia os fatos crus e nuances do caso.
+        1. Leia o PDF e extraia os fatos cruciais.
         2. Preencha o resumo_estrategico, timeline e vulnerabilidades_contraparte.
-        3. Preencha a base_legal, jurisprudencia e doutrina.
-        4. O seu objetivo é EXCLUSIVAMENTE fornecer um mapeamento processual, jurimetria e estratégia de combate.
+        3. Preencha a base_legal, jurisprudencia e doutrina com citações curtas.
+        4. O seu objetivo é EXCLUSIVAMENTE fornecer um mapeamento processual, jurimetria e estratégia de combate direta e reta.
         """
         
-        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia analítica completa do caso."
+        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia analítica completa."
 
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
@@ -108,7 +164,6 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
-        # Configuração delegando 100% da formatação para a SDK do Google
         config_ia_kwargs = dict(
             system_instruction=instrucao_sistema,
             temperature=0.3, 
@@ -129,26 +184,13 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             config=config_ia
         )
 
-        # Parse Inteligente: Tenta usar o objeto Pydantic validado nativamente pela Google
-        if getattr(response, 'parsed', None) is not None:
-            dados_json = response.parsed.model_dump()
-            TASKS[task_id] = {"status": "done", "resultado": dados_json}
-        else:
-            # Fallback seguro caso o parsed não retorne
-            texto_puro = response.text.strip()
-            if texto_puro.startswith("```json"):
-                texto_puro = texto_puro[7:]
-            elif texto_puro.startswith("```"):
-                texto_puro = texto_puro[3:]
-            if texto_puro.endswith("```"):
-                texto_puro = texto_puro[:-3]
-                
-            dados_json = json.loads(texto_puro.strip(), strict=False)
-            TASKS[task_id] = {"status": "done", "resultado": dados_json}
+        # Usamos o parser de força bruta para garantir 100% de sucesso
+        dados_json = forca_bruta_json(response.text)
+        TASKS[task_id] = {"status": "done", "resultado": dados_json}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
-        TASKS[task_id] = {"status": "error", "erro": f"Erro interno: {erro_seguro}"}
+        TASKS[task_id] = {"status": "error", "erro": f"Falha sistêmica: {erro_seguro}"}
     finally:
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
