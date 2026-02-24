@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M.A | Jus IA Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = { theme: { extend: { colors: { deep: '#020617', panel: '#0f172a', bordercolor: '#1e293b', brand: { 500: '#3b82f6' } } } } }
+    </script>
+    <style>
+        body { background-color: #020617; color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .btn-premium { background: linear-gradient(135deg, #1d4ed8, #3b82f6); box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        .tab-active { border-bottom: 2px solid #3b82f6; color: white; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <header class="p-6 border-b border-bordercolor flex justify-between items-center glass sticky top-0 z-50">
+        <h1 class="text-3xl font-black tracking-tighter italic">M.A | <span class="text-brand-500">Analytics</span></h1>
+        <div class="flex gap-4">
+            <select id="areaDireito" class="bg-panel border border-bordercolor p-2 rounded-lg text-xs text-white">
+                <option value="Direito Criminal">Criminal</option>
+                <option value="Direito Civil">Civil</option>
+                <option value="Direito de Família">Família</option>
+            </select>
+            <button id="btnExecutar" onclick="processar()" class="btn-premium px-6 py-2 rounded-lg font-bold text-xs uppercase tracking-widest">Auditar Processo</button>
+        </div>
+    </header>
+
+    <main class="flex-1 p-6 space-y-8 max-w-7xl mx-auto w-full">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div class="lg:col-span-3 glass rounded-2xl p-6">
+                <textarea id="fatosCaso" rows="4" class="w-full bg-transparent text-lg text-slate-200 outline-none resize-none" placeholder="Cole aqui o prompt estratégico do seu extrator local..."></textarea>
+            </div>
+            <div class="lg:col-span-1 border-2 border-dashed border-slate-700 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 transition-all" onclick="document.getElementById('arquivos').click()">
+                <input type="file" id="arquivos" multiple accept=".pdf" class="hidden" onchange="updateLabel()">
+                <i class="fa-solid fa-microscope text-3xl text-slate-600 mb-2"></i>
+                <p class="text-[10px] uppercase font-bold text-slate-500" id="fileLabel">Anexar PDF (Máx 800 pgs)</p>
+            </div>
+        </div>
+
+        <div id="loader" class="hidden text-center py-20">
+            <div class="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+            <p class="mt-4 text-brand-500 font-bold animate-pulse uppercase tracking-widest">Cruzando Provas e Laudos...</p>
+        </div>
+
+        <div id="results" class="hidden space-y-8">
+            
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold">Relatório de Inteligência Processual</h2>
+                <button onclick="baixarDossie()" class="bg-white text-black px-6 py-2 rounded-lg font-bold text-xs hover:bg-brand-500 hover:text-white transition-all">Download Dossiê (.docx)</button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="glass rounded-2xl p-6 border-l-4 border-l-amber-500">
+                    <h3 class="text-xs font-black text-amber-500 uppercase mb-4"><i class="fa-solid fa-magnifying-glass-chart mr-2"></i> Auditoria de Provas e Laudos</h3>
+                    <ul id="analiseProvas" class="space-y-3 text-sm text-slate-300"></ul>
+                </div>
+                <div class="glass rounded-2xl p-6 border-l-4 border-l-red-600">
+                    <h3 class="text-xs font-black text-red-600 uppercase mb-4"><i class="fa-solid fa-shield-halved mr-2"></i> Vulnerabilidades da Contraparte</h3>
+                    <ul id="vulnerabilidades" class="space-y-3 text-sm text-slate-300"></ul>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="glass rounded-2xl p-6 col-span-1">
+                    <h3 class="text-xs font-black text-purple-500 uppercase mb-4">Tendência do Juízo</h3>
+                    <p id="jurimetria" class="text-sm text-slate-300 leading-relaxed italic"></p>
+                </div>
+                <div class="glass rounded-2xl p-6 col-span-2">
+                    <h3 class="text-xs font-black text-green-500 uppercase mb-4">Report Estratégico para o Cliente</h3>
+                    <p id="resumo_cliente" class="text-sm text-slate-300 leading-relaxed"></p>
+                </div>
+            </div>
+
+            <div class="glass rounded-2xl overflow-hidden">
+                <div class="flex border-b border-bordercolor">
+                    <button onclick="mudarTab('legal')" id="tab-legal" class="flex-1 p-4 text-xs font-black uppercase tab-active">Fundamentação</button>
+                    <button onclick="mudarTab('juris')" id="tab-juris" class="flex-1 p-4 text-xs font-black uppercase text-slate-500">Jurisprudência</button>
+                </div>
+                <div class="p-6">
+                    <ul id="listaLegal" class="space-y-4 text-sm text-slate-300"></ul>
+                    <ul id="listaJuris" class="hidden space-y-4 text-sm text-slate-300"></ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let globalData = null;
+        function updateLabel() { const c = document.getElementById('arquivos').files.length; document.getElementById('fileLabel').innerText = c + " VOLUMES CARREGADOS"; }
+        
+        function mudarTab(t) {
+            document.getElementById('listaLegal').classList.toggle('hidden', t !== 'legal');
+            document.getElementById('listaJuris').classList.toggle('hidden', t !== 'juris');
+            document.getElementById('tab-legal').classList.toggle('tab-active', t === 'legal');
+            document.getElementById('tab-juris').classList.toggle('tab-active', t === 'juris');
+        }
+
+        async function processar() {
+            const fatos = document.getElementById('fatosCaso').value;
+            if(!fatos) return alert("Cole a análise do estrategista.");
+            
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+
+            const fd = new FormData();
+            fd.append("fatos_do_caso", fatos);
+            fd.append("area_direito", document.getElementById('areaDireito').value);
+            for(let f of document.getElementById('arquivos').files) fd.append("arquivos", f);
+
+            const res = await fetch('/analisar', { method: 'POST', body: fd });
+            const { task_id } = await res.json();
+
+            const timer = setInterval(async () => {
+                const sRes = await fetch(`/status/${task_id}`);
+                const sData = await sRes.json();
+                if(sData.status === "done") {
+                    clearInterval(timer);
+                    render(sData.resultado);
+                } else if(sData.status === "error") {
+                    clearInterval(timer);
+                    alert("Erro: " + sData.erro);
+                    document.getElementById('loader').classList.add('hidden');
+                }
+            }, 4000);
+        }
+
+        function render(d) {
+            globalData = d;
+            document.getElementById('jurimetria').innerText = d.jurimetria;
+            document.getElementById('resumo_cliente').innerText = d.resumo_cliente;
+            
+            const list = (id, arr) => {
+                const el = document.getElementById(id); el.innerHTML = '';
+                arr.forEach(i => el.innerHTML += `<li class="p-3 bg-white/5 rounded-lg border border-white/5"> ${i}</li>`);
+            };
+            list('analiseProvas', d.analise_provas);
+            list('vulnerabilidades', d.vulnerabilidades_contraparte);
+            list('listaLegal', d.base_legal);
+            list('listaJuris', d.jurisprudencia);
+
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('results').classList.remove('hidden');
+        }
+
+        async function baixarDossie() {
+            let texto = `DOSSIÊ DE INTELIGÊNCIA PROCESSUAL\n\n=== JURIMETRIA ===\n${globalData.jurimetria}\n\n=== AUDITORIA DE PROVAS ===\n${globalData.analise_provas.join('\n')}\n\n=== VULNERABILIDADES ===\n${globalData.vulnerabilidades_contraparte.join('\n')}`;
+            const res = await fetch('/gerar_docx', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ texto_total: texto })
+            });
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = "Dossie_Analitico.docx"; a.click();
+        }
+    </script>
+</body>
+</html>
