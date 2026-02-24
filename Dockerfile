@@ -1,21 +1,22 @@
 FROM python:3.10-slim
 
-# --- BLINDAGEM DE IDIOMA (Resolve o erro do \u0303 e acentos) ---
+# Blindagem de Idioma e Acentos
 ENV PYTHONIOENCODING=utf-8
 ENV LANG=C.UTF-8
-# ---------------------------------------------------------------
-
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    libmagic-dev \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
+
+# Instalação mínima de dependências do sistema
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Comando otimizado para economia de RAM e estabilidade
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "10000", "--timeout-keep-alive", "600"]
+# Comando com worker único para estabilidade total no Render
+CMD ["gunicorn", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "api:app", "--bind", "0.0.0.0:10000", "--timeout", "600"]
