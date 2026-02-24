@@ -14,7 +14,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
-# --- SEU SCHEMA COM O TRUQUE DO ARRAY ---
+# --- SEU SCHEMA COM O TRUQUE DO ARRAY QUE FUNCIONA ---
 class SchemaTimeline(BaseModel):
     data: str
     evento: str
@@ -29,7 +29,7 @@ class SchemaRespostaIA(BaseModel):
     base_legal: List[str]
     jurisprudencia: List[str]
     doutrina: List[str]
-    peca_processual: List[str] # Mantive sua lógica de Array para evitar quebra de JSON
+    peca_processual: List[str] # Mantendo sua lógica de Array
 
 class DadosPeca(BaseModel):
     texto_peca: str
@@ -40,7 +40,7 @@ class DadosPeca(BaseModel):
 app = FastAPI()
 TASKS = {}
 
-# ESCUDO DE REPARO (Para garantir que o JSON longo não trave)
+# REPARO ADICIONAL PARA SEGURANÇA
 def extrair_json_seguro(texto_bruto):
     texto = texto_bruto.strip()
     if texto.startswith("```json"): texto = texto[7:]
@@ -52,29 +52,30 @@ def extrair_json_seguro(texto_bruto):
         for sufixo in ['"', '"]', '"}', '"]}', ']}', '}']:
             try: return json.loads(texto + sufixo, strict=False)
             except: continue
-        raise Exception("A resposta foi cortada por ser muito longa. Tente simplificar o prompt.")
+        raise Exception("Erro de formatação na resposta da IA.")
 
 @app.get("/")
 def serve_index():
     return FileResponse("index.html")
 
-async def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_brutos: list):
+def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, caminhos: list):
     try:
         api_key = os.getenv("GEMINI_API_KEY")
         client = genai.Client(api_key=api_key)
         conteudos = []
 
-        for target_file in arquivos_brutos:
-            gemini_file = client.files.upload(file=target_file, config={'mime_type': 'application/pdf'})
-            while client.files.get(name=gemini_file.name).state.name != "ACTIVE":
+        for p in caminhos:
+            f = client.files.upload(file=p, config={'mime_type': 'application/pdf'})
+            while client.files.get(name=f.name).state.name != "ACTIVE":
                 time.sleep(3)
-            conteudos.append(types.Part.from_uri(file_uri=gemini_file.uri, mime_type='application/pdf'))
+            conteudos.append(types.Part.from_uri(file_uri=f.uri, mime_type='application/pdf'))
 
-        instrucao = f"Você é o M.A JUS IA. Especialidade: {area}. Siga o schema JSON rigorosamente."
+        # USANDO O MODELO MAIS ESTÁVEL PARA EVITAR 404
+        instrucao = f"Você é o M.A JUS IA. Especialidade: {area}. Regra: peca_processual deve ser uma lista de strings (parágrafos)."
         prompt = f"ESTRATÉGIA:\n{fatos}\n\nJuízo: {mag} | Vara: {trib}"
 
         response = client.models.generate_content(
-            model='gemini-3-flash', # Única mudança: Modelo atual de 2026
+            model='gemini-1.5-flash', # O modelo "tanque de guerra" estável
             contents=conteudos + [prompt],
             config=types.GenerateContentConfig(
                 system_instruction=instrucao,
@@ -87,7 +88,7 @@ async def processar_background(task_id: str, fatos: str, area: str, mag: str, tr
 
         dados_json = extrair_json_seguro(response.text)
         
-        # SUA LÓGICA DE RECONSTRUÇÃO: Junta o Array em uma String única para o Frontend
+        # SUA LÓGICA DE RECONSTRUÇÃO DO ARRAY
         if isinstance(dados_json.get('peca_processual'), list):
             dados_json['peca_processual'] = '\n\n'.join(dados_json['peca_processual'])
 
@@ -95,14 +96,14 @@ async def processar_background(task_id: str, fatos: str, area: str, mag: str, tr
     except Exception as e:
         TASKS[task_id] = {"status": "error", "erro": str(e)}
     finally:
-        for f in arquivos_brutos:
-            if os.path.exists(f): os.remove(f)
+        for p in caminhos:
+            if os.path.exists(p): os.remove(p)
 
 @app.post("/analisar")
 async def analisar(
     background_tasks: BackgroundTasks,
     fatos_do_caso: str = Form(...),
-    area_direito: str = Form(...),
+    area_direito: str = Form("Direito Criminal"),
     magistrado: str = Form(""),
     tribunal: str = Form(""),
     arquivos: Optional[List[UploadFile]] = File(None)
@@ -113,7 +114,8 @@ async def analisar(
     if arquivos:
         for arq in arquivos:
             tmp = f"temp_{uuid.uuid4().hex}.pdf"
-            with open(tmp, "wb") as f: f.write(await arq.read())
+            content = await arq.read()
+            with open(tmp, "wb") as f: f.write(content)
             caminhos.append(tmp)
     
     background_tasks.add_task(processar_background, task_id, fatos_do_caso, area_direito, magistrado, tribunal, caminhos)
@@ -126,11 +128,21 @@ def check_status(task_id: str):
 @app.post("/gerar_docx")
 def gerar_docx(dados: DadosPeca):
     doc = docx.Document()
-    for linha in dados.texto_peca.split('\n'):
+    for s in doc.sections: s.top_margin, s.bottom_margin = Cm(3), Cm(2)
+    
+    if dados.advogado_nome:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        r = p.add_run(f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}")
+        r.font.size, r.font.name, r.italic = Pt(10), 'Times New Roman', True
+
+    for linha in dados.texto_peca.replace('\\n', '\n').split('\n'):
         if linha.strip():
-            p = doc.add_paragraph(linha.strip())
-            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            para = doc.add_paragraph(linha.strip())
+            para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            para.paragraph_format.first_line_indent = Cm(2.0)
+
     buf = io.BytesIO()
     doc.save(buf)
     buf.seek(0)
-    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
