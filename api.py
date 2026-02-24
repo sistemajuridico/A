@@ -3,7 +3,6 @@ import io
 import json
 import time
 import uuid
-import unicodedata
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -14,7 +13,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
-# --- SCHEMAS DE DADOS ---
+# --- SCHEMAS ---
 class SchemaTimeline(BaseModel):
     data: str
     evento: str
@@ -40,74 +39,56 @@ class DadosPeca(BaseModel):
 app = FastAPI()
 TASKS = {}
 
-# --- MOTOR DE REPARO DE JSON ---
 def extrair_json_seguro(texto_bruto):
     texto = texto_bruto.strip()
     if texto.startswith("```json"): texto = texto[7:]
     elif texto.startswith("```"): texto = texto[3:]
     if texto.endswith("```"): texto = texto[:-3]
     texto = texto.strip()
-
     try:
         return json.loads(texto, strict=False)
     except json.JSONDecodeError:
-        # Tenta fechar chaves cortadas por limite de tokens
         for sufixo in ['"', '"]', '"}', '"]}', ']}', '}']:
-            try:
-                return json.loads(texto + sufixo, strict=False)
-            except:
-                continue
-        raise Exception("A resposta da IA foi excessivamente longa e o JSON quebrou. Tente simplificar o prompt.")
+            try: return json.loads(texto + sufixo, strict=False)
+            except: continue
+        raise Exception("Erro na formatação da resposta. Tente novamente.")
 
 @app.get("/")
 def serve_index():
     return FileResponse("index.html")
 
-def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_brutos: list):
-    arquivos_para_gemini = []
+def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, caminhos: list):
     try:
         api_key = os.getenv("GEMINI_API_KEY")
         client = genai.Client(api_key=api_key)
-        conteudos_multimais = []
+        parts = []
 
-        for target_file in arquivos_brutos:
-            gemini_file = client.files.upload(file=target_file, config={'mime_type': 'application/pdf'})
-            while True:
-                f_info = client.files.get(name=gemini_file.name)
-                if str(f_info.state).upper() == "ACTIVE": break
+        for path in caminhos:
+            f = client.files.upload(file=path, config={'mime_type': 'application/pdf'})
+            while client.files.get(name=f.name).state.name != "ACTIVE":
                 time.sleep(3)
-            conteudos_multimais.append(types.Part.from_uri(file_uri=f_info.uri, mime_type='application/pdf'))
+            parts.append(types.Part.from_uri(file_uri=f.uri, mime_type='application/pdf'))
 
-        instrucao_sistema = f"""
-        Você é o M.A | JUS IA EXPERIENCE. Especialidade: {area}.
-        Responda obrigatoriamente em JSON.
-        REGRAS: 
-        1. Use apenas aspas simples (') dentro dos textos. 
-        2. Use '\\n' para quebras de linha.
-        3. Se a peça for longa, priorize a fundamentação jurídica.
-        """
-        
-        prompt_comando = f"ESTRATÉGIA:\n{fatos}\n\nJuízo: {mag} | Vara: {trib}"
+        sys_instr = f"Você é o M.A JUS IA. Especialidade: {area}. Responda apenas em JSON com aspas simples nos textos."
+        prompt = f"ESTRATÉGIA:\n{fatos}\n\nJuízo: {mag} | Vara: {trib}"
         
         response = client.models.generate_content(
-            model='gemini-2.0-flash', 
-            contents=conteudos_multimais + [prompt_comando],
+            model='gemini-2.0-flash',
+            contents=parts + [prompt],
             config=types.GenerateContentConfig(
-                system_instruction=instrucao_sistema,
+                system_instruction=sys_instr,
                 temperature=0.2,
                 max_output_tokens=8192,
                 response_mime_type="application/json",
                 response_schema=SchemaRespostaIA
             )
         )
-
         TASKS[task_id] = {"status": "done", "resultado": extrair_json_seguro(response.text)}
-
     except Exception as e:
         TASKS[task_id] = {"status": "error", "erro": str(e)}
     finally:
-        for f in arquivos_brutos:
-            if os.path.exists(f): os.remove(f)
+        for p in caminhos:
+            if os.path.exists(p): os.remove(p)
 
 @app.post("/analisar")
 async def analisar(
@@ -123,20 +104,19 @@ async def analisar(
     caminhos = []
     if arquivos:
         for arq in arquivos:
-            if not arq.filename: continue
             tmp = f"temp_{uuid.uuid4().hex}.pdf"
-            with open(tmp, "wb") as b: b.write(arq.file.read())
+            content = await arq.read() # Correção para leitura assíncrona
+            with open(tmp, "wb") as f: f.write(content)
             caminhos.append(tmp)
-
     background_tasks.add_task(processar_background, task_id, fatos_do_caso, area_direito, magistrado, tribunal, caminhos)
     return {"task_id": task_id}
 
 @app.get("/status/{task_id}")
 def status(task_id: str):
-    return TASKS.get(task_id, {"status": "error", "erro": "Tarefa não encontrada"})
+    return TASKS.get(task_id, {"status": "error", "erro": "ID inválido"})
 
 @app.post("/gerar_docx")
-def gerar_docx(dados: DadosPeca):
+async def gerar_docx(dados: DadosPeca):
     doc = docx.Document()
     for s in doc.sections: s.top_margin, s.bottom_margin = Cm(3), Cm(2)
     
@@ -146,7 +126,8 @@ def gerar_docx(dados: DadosPeca):
         r = p.add_run(f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}")
         r.font.size, r.font.name, r.italic = Pt(10), 'Times New Roman', True
 
-    for linha in dados.texto_peca.replace('\\n', '\n').split('\n'):
+    texto = dados.texto_peca.replace('\\n', '\n')
+    for linha in texto.split('\n'):
         if linha.strip():
             para = doc.add_paragraph(linha.strip())
             para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
