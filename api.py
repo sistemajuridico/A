@@ -105,21 +105,30 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
-        Concentre-se na análise técnica, doutrinária e jurisprudencial.
         
-        REGRA CRÍTICA: É ESTRITAMENTE PROIBIDO copiar ou transcrever as petições antigas do PDF. O PDF é apenas o histórico do caso.
-        O seu trabalho é redigir uma PEÇA NOVA, INÉDITA e com a DATA ATUAL (Ano Corrente), rebatendo o que está no PDF e usando os Fatos Novos.
+        ARQUITETURA DE PENSAMENTO ESTRATÉGICO (SIGA ESTA ORDEM ESTRITAMENTE):
+        1. ANÁLISE: Leia o PDF apenas como histórico do caso. Mapeie a cronologia e encontre as vulnerabilidades da contraparte.
+        2. ARMAMENTO JURÍDICO: Levante a base legal, a jurisprudência e a doutrina aplicáveis especificamente para atacar as vulnerabilidades encontradas.
+        3. REDAÇÃO DA PEÇA: APENAS APÓS concluir a análise e o levantamento jurídico, redija a petição.
         
-        ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
-        Você DEVE redigir a NOVA PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
-        Inclua obrigatoriamente: Endereçamento correto, Qualificação completa, Dos Fatos, Do Direito, Dos Pedidos e Fecho formal.
+        REGRA CRÍTICA E INEGOCIÁVEL PARA A PEÇA PROCESSUAL: 
+        - É ESTRITAMENTE PROIBIDO copiar ou transcrever as petições antigas do PDF.
+        - Você DEVE redigir uma PEÇA NOVA e INÉDITA do ZERO.
+        - Utilize OBRIGATORIAMENTE na redação as armas que você acabou de criar (vulnerabilidades mapeadas, base legal, jurisprudência e doutrina).
+        - A peça deve ser COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO (Endereçamento, Qualificação, Fatos, Direito, Pedidos, Fecho formal).
 
-        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
+        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA (preenchendo nesta ordem exata):
         {{
-            "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
-            "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
-            "base_legal": [], "jurisprudencia": [], "doutrina": [], 
-            "peca_processual": "TEXTO INTEGRAL E EXTENSO DA NOVA PEÇA AQUI..."
+            "resumo_estrategico": "Sua análise técnica do cenário...", 
+            "jurimetria": "...", 
+            "resumo_cliente": "...",
+            "timeline": ["...", "..."], 
+            "vulnerabilidades_contraparte": ["Fraqueza 1", "Fraqueza 2"], 
+            "checklist": ["...", "..."],
+            "base_legal": ["Lei X...", "Artigo Y..."], 
+            "jurisprudencia": ["Decisão 1...", "Súmula Z..."], 
+            "doutrina": ["...", "..."], 
+            "peca_processual": "TEXTO INTEGRAL DA NOVA PEÇA AQUI, CONSTRUÍDA OBRIGATORIAMENTE COM AS TESES E JURISPRUDÊNCIAS DOS CAMPOS ANTERIORES..."
         }}
         """
         
@@ -260,3 +269,4 @@ def gerar_docx(dados: DadosPeca):
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
         return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
+
