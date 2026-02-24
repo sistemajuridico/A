@@ -331,6 +331,7 @@
 
             if(analiseGlobal.jurimetria) tc += "=== JURIMETRIA E TENDÊNCIAS DO JUÍZO ===\n" + analiseGlobal.jurimetria + "\n\n";
             if(analiseGlobal.resumo_estrategico) tc += "=== RESUMO TÉCNICO ===\n" + analiseGlobal.resumo_estrategico + "\n\n";
+            if(analiseGlobal.resumo_cliente) tc += "=== REPORT AO CLIENTE ===\n" + analiseGlobal.resumo_cliente + "\n\n";
             
             if(analiseGlobal.timeline?.length) {
                 tc += "=== CRONOLOGIA DO CASO ===\n";
@@ -341,7 +342,7 @@
                 analiseGlobal.vulnerabilidades_contraparte.forEach(v => tc += `- ${v}\n`); tc += "\n";
             }
             if(analiseGlobal.checklist?.length) {
-                tc += "=== PROVIDÊNCIAS ===\n";
+                tc += "=== PROVIDÊNCIAS NECESSÁRIAS ===\n";
                 analiseGlobal.checklist.forEach(c => tc += `- ${c}\n`); tc += "\n";
             }
             if(analiseGlobal.base_legal?.length) {
