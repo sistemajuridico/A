@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>M.A | Jus IA Experience</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="[https://cdn.tailwindcss.com](https://cdn.tailwindcss.com)"></script>
+    <link href="[https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:wght@700&display=swap)" rel="stylesheet">
+    <link rel="stylesheet" href="[https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css](https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css)">
     
     <script>
         tailwind.config = {
@@ -150,14 +150,6 @@
                             <ul id="listaDoutrina" class="hidden space-y-4"></ul>
                         </div>
                     </div>
-
-                    <div class="glass rounded-3xl p-8 border border-brand-500/20 shadow-2xl">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="font-serif text-2xl text-white">Minuta Processual de Elite</h3>
-                            <button onclick="baixarDoc()" class="bg-white text-black px-6 py-3 rounded-xl font-bold text-xs hover:bg-brand-500 hover:text-white transition-all shadow-lg">BAIXAR APENAS PETIÇÃO</button>
-                        </div>
-                        <textarea id="peca" rows="20" class="w-full bg-deep/50 p-6 rounded-2xl text-sm font-serif leading-relaxed text-slate-400 border border-white/5 outline-none"></textarea>
-                    </div>
                 </div>
             </div>
         </div>
@@ -187,7 +179,6 @@
                 return;
             }
 
-            // LIMITE AUMENTADO PARA 100MB POR FICHEIRO
             const MAX_SIZE = 100 * 1024 * 1024; 
             const arquivosInput = document.getElementById('arquivos').files;
             
@@ -277,7 +268,6 @@
 
             document.getElementById('jurimetria').innerText = d.jurimetria || "Análise indisponível.";
             document.getElementById('resumo_cliente').innerText = d.resumo_cliente || "";
-            document.getElementById('peca').value = d.peca_processual || "";
 
             const tc = document.getElementById('timeline'); tc.innerHTML = '';
             (d.timeline || []).forEach(t => {
@@ -315,16 +305,6 @@
             alert("Texto copiado!"); 
         }
 
-        async function baixarDoc() {
-            const payload = {
-                texto_peca: document.getElementById('peca').value,
-                advogado_nome: document.getElementById('advNome').value,
-                advogado_oab: document.getElementById('advOAB').value,
-                advogado_endereco: document.getElementById('advEndereco').value
-            };
-            enviarParaServidorWord(payload, "MA_Minuta_Peticional.docx");
-        }
-
         async function baixarDossieCompleto() {
             if (!analiseGlobal) return;
             let tc = "M.A | JUS IA EXPERIENCE - DOSSIÊ ESTRATÉGICO COMPLETO\n\n";
@@ -357,7 +337,6 @@
                 tc += "=== REFERÊNCIAS DOUTRINÁRIAS ===\n";
                 analiseGlobal.doutrina.forEach(d => tc += `- ${d}\n`); tc += "\n";
             }
-            if(analiseGlobal.peca_processual) tc += "=== MINUTA DA PEÇA PROCESSUAL ===\n" + analiseGlobal.peca_processual + "\n\n";
 
             enviarParaServidorWord({
                 texto_peca: tc,
