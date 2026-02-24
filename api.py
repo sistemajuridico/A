@@ -82,22 +82,26 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
+        # --- BLINDAGEM MÁXIMA ANTI-ERRO DE JSON APLICADA AQUI ---
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Consultor Estratégico. Especialidade: {area}.
         
         REGRA DE OURO E INEGOCIÁVEL: O documento PDF enviado é APENAS MATERIAL DE CONSULTA.
         
-        ARQUITETURA DE PENSAMENTO (SIGA ESTA ORDEM):
+        ARQUITETURA DE PENSAMENTO:
         1. Leia o PDF e extraia os fatos crus e nuances do caso.
         2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte'.
         3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
-        4. O seu objetivo é EXCLUSIVAMENTE fornecer um mapeamento processual, jurimetria e estratégia de combate. NÃO redija minutas ou peças processuais.
+        4. O seu objetivo é EXCLUSIVAMENTE fornecer um mapeamento processual, jurimetria e estratégia de combate. NÃO redija minutas processuais.
 
-        REGRA ABSOLUTA DE FORMATAÇÃO:
-        - NUNCA use aspas duplas (" ") dentro do texto das suas respostas, substitua SEMPRE por aspas simples (' ').
+        REGRAS ABSOLUTAS E FATAIS DE FORMATAÇÃO JSON (SE VOCÊ QUEBRAR, O SISTEMA EXPLODE):
+        - DEVOLVA EXATAMENTE E APENAS UM JSON VÁLIDO. Sem formatação Markdown.
+        - PROIBIDO usar aspas duplas (" ") DENTRO dos seus textos. Troque QUALQUER aspas duplas por aspas simples (' ').
+        - PROIBIDO usar quebras de linha reais (Enter) dentro das strings. Todo texto de um campo deve estar na mesma linha. Se precisar separar parágrafos visualmente, digite os caracteres \\n explicitamente.
+        - NÃO deixe vírgulas sobrando no final de listas.
         """
         
-        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia analítica baseada nestes direcionamentos."
+        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia analítica e preencha os dados no JSON."
 
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
@@ -112,7 +116,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         config_ia_kwargs = dict(
             system_instruction=instrucao_sistema,
-            temperature=0.35, 
+            temperature=0.2, # Baixei a temperatura para a IA ficar menos criativa na formatação e mais exata
             max_output_tokens=8192, 
             response_mime_type="application/json",
             response_schema=SchemaRespostaIA, 
@@ -137,6 +141,8 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             raise Exception(motivo)
 
         texto_puro = response.text.strip()
+        
+        # Limpeza agressiva de backticks caso a IA insista no Markdown
         if texto_puro.startswith("```json"):
             texto_puro = texto_puro[7:]
         elif texto_puro.startswith("```"):
@@ -144,12 +150,21 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if texto_puro.endswith("```"):
             texto_puro = texto_puro[:-3]
             
-        dados_json = json.loads(texto_puro.strip(), strict=False)
-        TASKS[task_id] = {"status": "done", "resultado": dados_json}
+        texto_puro = texto_puro.strip()
+        
+        # Tratamento especial de erro de JSON para exibir exatamente onde a IA errou
+        try:
+            dados_json = json.loads(texto_puro, strict=False)
+            TASKS[task_id] = {"status": "done", "resultado": dados_json}
+        except json.JSONDecodeError as e:
+            # Captura o texto ao redor do erro para nos dizer no alerta exatamente o que causou
+            posicao_erro = e.pos
+            recorte_erro = texto_puro[max(0, posicao_erro - 30):posicao_erro + 30]
+            raise Exception(f"A IA corrompeu o texto na seguinte parte: [... {recorte_erro} ...]. Tente rodar a análise novamente.")
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
-        TASKS[task_id] = {"status": "error", "erro": f"Erro interno ou formatação corrompida: {erro_seguro}"}
+        TASKS[task_id] = {"status": "error", "erro": f"Erro interno: {erro_seguro}"}
     finally:
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
