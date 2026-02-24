@@ -104,43 +104,42 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # Injeção da data atual para evitar documentos datados do ano passado
-        data_hoje = datetime.now().strftime("%d/%m/%Y")
+        # DATA ATUAL PARA FORÇAR O PRESENTE
+        hoje = datetime.now().strftime("%d/%m/%Y")
 
-        # NOVA ARQUITETURA DA MENTE: Análise Estratégica -> Armas -> Peça Inédita
+        # ARQUITETURA DA MENTE: ANÁLISE -> ESTRATÉGIA -> REDAÇÃO INÉDITA
         instrucoes = f"""
-        Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite. Especialidade: {area}.
-        HOJE É DIA {data_hoje}.
-        
-        SUA MISSÃO EM 3 PASSOS:
-        1. ANALISAR: Identifique no PDF as falhas da acusação/contraparte.
-        2. ARMAMENTÁRIO: Liste jurisprudência e leis que aniquilam os argumentos do adversário.
-        3. EXECUTAR: Construa uma PEÇA PROCESSUAL 100% DO ZERO. 
-        
-        REGRAS INEGOCIÁVEIS:
-        - É PROIBIDO copiar textos, parágrafos ou o estilo das petições antigas que estão no PDF.
-        - Utilize obrigatoriamente as falhas e jurisprudências encontradas nos passos 1 e 2 para escrever a peça do passo 3.
-        - Não use nomes de advogados do PDF. Assine como "[NOME DO ADVOGADO] - [OAB]".
-        - A peça deve ser extensa, formal e completa (Endereçamento, Fatos, Direito, Pedidos).
+        Você é o M.A | JUS IA EXPERIENCE, Advogado de Elite ({area}). 
+        DATA DE HOJE: {hoje}.
 
-        RETORNE ESTRITAMENTE EM JSON:
+        PROCESSO DE RACIOCÍNIO OBRIGATÓRIO:
+        1. ANÁLISE TÉCNICA: Identifique todas as nulidades e fraquezas no PDF.
+        2. ESTRATÉGIA: Selecione a jurisprudência e leis que rebatem os pontos do PDF.
+        3. REDAÇÃO FINAL: Escreva uma petição NOVA, do zero, usando os pontos que você acabou de analisar.
+
+        REGRAS CRÍTICAS:
+        - PROIBIDO copiar ou imitar as petições antigas do PDF.
+        - PROIBIDO usar nomes de advogados que constam no PDF. Assine "[NOME DO ADVOGADO]".
+        - A 'peca_processual' deve ser completa e extensa, ignorando o passado e focando na tese nova.
+
+        RETORNE APENAS O JSON:
         {{
-            "resumo_estrategico": "...", 
-            "jurimetria": "...", 
+            "resumo_estrategico": "...",
+            "jurimetria": "...",
             "resumo_cliente": "...",
-            "timeline": [], 
-            "vulnerabilidades_contraparte": [], 
+            "timeline": [],
+            "vulnerabilidades_contraparte": [],
             "checklist": [],
-            "base_legal": [], 
-            "jurisprudencia": [], 
-            "doutrina": [], 
-            "peca_processual": "REDAÇÃO DA PEÇA INÉDITA AQUI..."
+            "base_legal": [],
+            "jurisprudencia": [],
+            "doutrina": [],
+            "peca_processual": "TEXTO DA NOVA PETIÇÃO AQUI..."
         }}
         """
         
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
-        prompt_partes.append(f"{instrucoes}\n\nFATOS NOVOS E PEDIDO DO USUÁRIO:\n{fatos}")
+        prompt_partes.append(f"{instrucoes}\n\nREQUISITO DO USUÁRIO:\n{fatos}")
 
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
@@ -149,21 +148,22 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
-        # Mantendo as configurações originais que não quebram o JSON
+        # Configurações otimizadas para não quebrar o JSON
         config_ia = types.GenerateContentConfig(
             temperature=0.1,
+            max_output_tokens=8192,
             response_mime_type="application/json",
             safety_settings=filtros_seguranca
         )
 
         response = client.models.generate_content(
-            model='gemini-2.5-flash', 
+            model='gemini-2.0-flash', 
             contents=prompt_partes,
             config=config_ia
         )
 
-        if getattr(response, 'text', None) is None:
-            raise Exception("A IA não gerou resposta. Verifique os filtros de segurança.")
+        if not response.text:
+            raise Exception("Resposta vazia da IA.")
 
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
@@ -174,8 +174,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
 
     except Exception as e:
-        erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
-        TASKS[task_id] = {"status": "error", "erro": f"{erro_seguro}"}
+        TASKS[task_id] = {"status": "error", "erro": str(e)}
     finally:
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
@@ -190,9 +189,6 @@ async def analisar_caso(
     arquivos: Optional[List[UploadFile]] = File(default=[])
 ):
     fatos_limpos = unicodedata.normalize('NFC', fatos_do_caso) if fatos_do_caso else ""
-    mag_limpo = unicodedata.normalize('NFC', magistrado) if magistrado else ""
-    trib_limpo = unicodedata.normalize('NFC', tribunal) if tribunal else ""
-
     if not fatos_limpos or len(fatos_limpos.strip()) < 5:
         return JSONResponse(content={"erro": "Descreva os fatos."}, status_code=400)
 
@@ -200,36 +196,21 @@ async def analisar_caso(
     TASKS[task_id] = {"status": "processing"}
 
     arquivos_brutos = []
-    try:
-        if arquivos:
-            for arquivo in arquivos:
-                if not arquivo.filename: continue
-                ext = arquivo.filename.lower().split('.')[-1]
-                safe_name = f"doc_{uuid.uuid4().hex}.{ext}"
-                temp_input = f"temp_in_{safe_name}"
-                
-                with open(temp_input, "wb") as buffer:
-                    while True:
-                        chunk = await arquivo.read(1024 * 1024)
-                        if not chunk:
-                            break
-                        buffer.write(chunk)
-                
-                arquivos_brutos.append((temp_input, ext, safe_name))
-                
-    except Exception as e:
-        return JSONResponse(content={"erro": "Erro ao processar arquivos."}, status_code=500)
+    if arquivos:
+        for arquivo in arquivos:
+            if not arquivo.filename: continue
+            ext = arquivo.filename.lower().split('.')[-1]
+            temp_input = f"temp_{uuid.uuid4().hex}.{ext}"
+            with open(temp_input, "wb") as buffer:
+                shutil.copyfileobj(arquivo.file, buffer)
+            arquivos_brutos.append((temp_input, ext, arquivo.filename))
 
-    background_tasks.add_task(processar_background, task_id, fatos_limpos, area_direito, mag_limpo, trib_limpo, arquivos_brutos)
-    
+    background_tasks.add_task(processar_background, task_id, fatos_limpos, area_direito, magistrado, tribunal, arquivos_brutos)
     return JSONResponse(content={"task_id": task_id})
 
 @app.get("/status/{task_id}")
 def check_status(task_id: str):
-    task = TASKS.get(task_id)
-    if not task:
-        return JSONResponse(content={"status": "error", "erro": "Tarefa não encontrada."})
-    return JSONResponse(content=task)
+    return JSONResponse(content=TASKS.get(task_id, {"status": "error", "erro": "ID não encontrado."}))
 
 class DadosPeca(BaseModel):
     texto_peca: str
@@ -247,7 +228,7 @@ def gerar_docx(dados: DadosPeca):
         if dados.advogado_nome:
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            run_h = p.add_run(f"{str(dados.advogado_nome).upper()}\nOAB: {dados.advogado_oab if dados.advogado_oab else '---'}\n{dados.advogado_endereco if dados.advogado_endereco else ''}")
+            run_h = p.add_run(f"{dados.advogado_nome.upper()}\nOAB: {dados.advogado_oab}\n{dados.advogado_endereco}")
             run_h.font.size, run_h.font.name, run_h.italic = Pt(10), 'Times New Roman', True
 
         for linha in dados.texto_peca.split('\n'):
@@ -260,6 +241,6 @@ def gerar_docx(dados: DadosPeca):
         buffer = io.BytesIO()
         doc.save(buffer)
         buffer.seek(0)
-        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=Minuta_M_A.docx"})
+        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=Peca_Processual.docx"})
     except Exception as e:
-        return JSONResponse(content={"erro": "Erro ao gerar Word."}, status_code=500)
+        return JSONResponse(content={"erro": str(e)}, status_code=500)
