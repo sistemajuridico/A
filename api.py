@@ -1,165 +1,239 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M.A | Jus IA Analytics</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = { theme: { extend: { colors: { deep: '#020617', panel: '#0f172a', bordercolor: '#1e293b', brand: { 500: '#3b82f6' } } } } }
-    </script>
-    <style>
-        body { background-color: #020617; color: #f1f5f9; font-family: 'Inter', sans-serif; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .btn-premium { background: linear-gradient(135deg, #1d4ed8, #3b82f6); box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
-        .tab-active { border-bottom: 2px solid #3b82f6; color: white; }
-    </style>
-</head>
-<body class="flex flex-col min-h-screen">
+import os
+import io
+import json
+import uuid
+import time
+import unicodedata
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request
+from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
+from pydantic import BaseModel
+from typing import List, Optional
+import docx
+from docx.shared import Pt, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from google import genai
+from google.genai import types
 
-    <header class="p-6 border-b border-bordercolor flex justify-between items-center glass sticky top-0 z-50">
-        <h1 class="text-3xl font-black tracking-tighter italic">M.A | <span class="text-brand-500">Analytics</span></h1>
-        <div class="flex gap-4">
-            <select id="areaDireito" class="bg-panel border border-bordercolor p-2 rounded-lg text-xs text-white">
-                <option value="Direito Criminal">Criminal</option>
-                <option value="Direito Civil">Civil</option>
-                <option value="Direito de Família">Família</option>
-            </select>
-            <button id="btnExecutar" onclick="processar()" class="btn-premium px-6 py-2 rounded-lg font-bold text-xs uppercase tracking-widest">Auditar Processo</button>
-        </div>
-    </header>
+class SchemaTimeline(BaseModel):
+    data: str
+    evento: str
 
-    <main class="flex-1 p-6 space-y-8 max-w-7xl mx-auto w-full">
+class SchemaRespostaIA(BaseModel):
+    resumo_estrategico: str
+    jurimetria: str
+    resumo_cliente: str
+    timeline: List[SchemaTimeline]
+    vulnerabilidades_contraparte: List[str]
+    checklist: List[str]
+    base_legal: List[str]
+    jurisprudencia: List[str]
+    doutrina: List[str]
+
+app = FastAPI()
+
+MAX_UPLOAD_SIZE = 300 * 1024 * 1024  
+
+@app.middleware("http")
+async def limit_upload_size(request: Request, call_next):
+    if request.method == "POST":
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_UPLOAD_SIZE:
+            return JSONResponse(
+                {"erro": "A soma total dos ficheiros excede 300MB. Envie menos volumes por vez."},
+                status_code=413
+            )
+    return await call_next(request)
+
+TASKS = {}
+
+@app.get("/")
+def serve_index():
+    return FileResponse("index.html")
+
+def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_brutos: list):
+    arquivos_para_gemini = []
+    try:
+        for temp_input, ext, safe_name in arquivos_brutos:
+            if ext == "pdf": 
+                arquivos_para_gemini.append((temp_input, "application/pdf"))
+            else:
+                os.remove(temp_input) # Descarta não-PDFs
+
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            TASKS[task_id] = {"status": "error", "erro": "Chave API não configurada."}
+            return
+
+        client = genai.Client(api_key=api_key)
+        conteudos_multimais = []
+
+        for target_file, mime in arquivos_para_gemini:
+            gemini_file = client.files.upload(file=target_file, config={'mime_type': mime})
+            while True:
+                f_info = client.files.get(name=gemini_file.name)
+                state_str = str(f_info.state).upper()
+                if "FAILED" in state_str:
+                    raise Exception("A IA falhou ao processar o ficheiro nos servidores da Google.")
+                if "ACTIVE" in state_str:
+                    break
+                time.sleep(3)
+            
+            conteudos_multimais.append(
+                types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
+            )
+
+        instrucao_sistema = f"""
+        Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Consultor Estratégico. Especialidade: {area}.
         
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div class="lg:col-span-3 glass rounded-2xl p-6">
-                <textarea id="fatosCaso" rows="4" class="w-full bg-transparent text-lg text-slate-200 outline-none resize-none" placeholder="Cole aqui o prompt estratégico do seu extrator local..."></textarea>
-            </div>
-            <div class="lg:col-span-1 border-2 border-dashed border-slate-700 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 transition-all" onclick="document.getElementById('arquivos').click()">
-                <input type="file" id="arquivos" multiple accept=".pdf" class="hidden" onchange="updateLabel()">
-                <i class="fa-solid fa-microscope text-3xl text-slate-600 mb-2"></i>
-                <p class="text-[10px] uppercase font-bold text-slate-500" id="fileLabel">Anexar PDF (Máx 800 pgs)</p>
-            </div>
-        </div>
-
-        <div id="loader" class="hidden text-center py-20">
-            <div class="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-            <p class="mt-4 text-brand-500 font-bold animate-pulse uppercase tracking-widest">Cruzando Provas e Laudos...</p>
-        </div>
-
-        <div id="results" class="hidden space-y-8">
-            
-            <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold">Relatório de Inteligência Processual</h2>
-                <button onclick="baixarDossie()" class="bg-white text-black px-6 py-2 rounded-lg font-bold text-xs hover:bg-brand-500 hover:text-white transition-all">Download Dossiê (.docx)</button>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="glass rounded-2xl p-6 border-l-4 border-l-amber-500">
-                    <h3 class="text-xs font-black text-amber-500 uppercase mb-4"><i class="fa-solid fa-magnifying-glass-chart mr-2"></i> Auditoria de Provas e Laudos</h3>
-                    <ul id="analiseProvas" class="space-y-3 text-sm text-slate-300"></ul>
-                </div>
-                <div class="glass rounded-2xl p-6 border-l-4 border-l-red-600">
-                    <h3 class="text-xs font-black text-red-600 uppercase mb-4"><i class="fa-solid fa-shield-halved mr-2"></i> Vulnerabilidades da Contraparte</h3>
-                    <ul id="vulnerabilidades" class="space-y-3 text-sm text-slate-300"></ul>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="glass rounded-2xl p-6 col-span-1">
-                    <h3 class="text-xs font-black text-purple-500 uppercase mb-4">Tendência do Juízo</h3>
-                    <p id="jurimetria" class="text-sm text-slate-300 leading-relaxed italic"></p>
-                </div>
-                <div class="glass rounded-2xl p-6 col-span-2">
-                    <h3 class="text-xs font-black text-green-500 uppercase mb-4">Report Estratégico para o Cliente</h3>
-                    <p id="resumo_cliente" class="text-sm text-slate-300 leading-relaxed"></p>
-                </div>
-            </div>
-
-            <div class="glass rounded-2xl overflow-hidden">
-                <div class="flex border-b border-bordercolor">
-                    <button onclick="mudarTab('legal')" id="tab-legal" class="flex-1 p-4 text-xs font-black uppercase tab-active">Fundamentação</button>
-                    <button onclick="mudarTab('juris')" id="tab-juris" class="flex-1 p-4 text-xs font-black uppercase text-slate-500">Jurisprudência</button>
-                </div>
-                <div class="p-6">
-                    <ul id="listaLegal" class="space-y-4 text-sm text-slate-300"></ul>
-                    <ul id="listaJuris" class="hidden space-y-4 text-sm text-slate-300"></ul>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <script>
-        let globalData = null;
-        function updateLabel() { const c = document.getElementById('arquivos').files.length; document.getElementById('fileLabel').innerText = c + " VOLUMES CARREGADOS"; }
+        REGRA DE OURO E INEGOCIÁVEL: O documento PDF enviado é APENAS MATERIAL DE CONSULTA.
         
-        function mudarTab(t) {
-            document.getElementById('listaLegal').classList.toggle('hidden', t !== 'legal');
-            document.getElementById('listaJuris').classList.toggle('hidden', t !== 'juris');
-            document.getElementById('tab-legal').classList.toggle('tab-active', t === 'legal');
-            document.getElementById('tab-juris').classList.toggle('tab-active', t === 'juris');
-        }
+        ARQUITETURA DE PENSAMENTO (SIGA ESTA ORDEM):
+        1. Leia o PDF e extraia os fatos crus e nuances do caso.
+        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte'.
+        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
+        4. O seu objetivo é EXCLUSIVAMENTE fornecer um mapeamento processual, jurimetria e estratégia de combate. NÃO redija minutas ou peças processuais.
 
-        async function processar() {
-            const fatos = document.getElementById('fatosCaso').value;
-            if(!fatos) return alert("Cole a análise do estrategista.");
+        REGRA ABSOLUTA DE FORMATAÇÃO:
+        - NUNCA use aspas duplas (" ") dentro do texto das suas respostas, substitua SEMPRE por aspas simples (' ').
+        """
+        
+        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia analítica baseada nestes direcionamentos."
+
+        prompt_partes = []
+        prompt_partes.extend(conteudos_multimais)
+        prompt_partes.append(prompt_comando)
+
+        filtros_seguranca = [
+            types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+            types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+        ]
+
+        config_ia_kwargs = dict(
+            system_instruction=instrucao_sistema,
+            temperature=0.35, 
+            max_output_tokens=8192, 
+            response_mime_type="application/json",
+            response_schema=SchemaRespostaIA, 
+            safety_settings=filtros_seguranca
+        )
+        
+        if len(conteudos_multimais) == 0:
+            config_ia_kwargs["tools"] = [{"googleSearch": {}}]
             
-            document.getElementById('loader').classList.remove('hidden');
-            document.getElementById('results').classList.add('hidden');
+        config_ia = types.GenerateContentConfig(**config_ia_kwargs)
 
-            const fd = new FormData();
-            fd.append("fatos_do_caso", fatos);
-            fd.append("area_direito", document.getElementById('areaDireito').value);
-            for(let f of document.getElementById('arquivos').files) fd.append("arquivos", f);
+        response = client.models.generate_content(
+            model='gemini-2.5-flash', 
+            contents=prompt_partes,
+            config=config_ia
+        )
 
-            const res = await fetch('/analisar', { method: 'POST', body: fd });
-            const { task_id } = await res.json();
+        if getattr(response, 'text', None) is None:
+            motivo = "A Google bloqueou a resposta silenciosamente."
+            if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
+                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial: {response.candidates[0].finish_reason}"
+            raise Exception(motivo)
 
-            const timer = setInterval(async () => {
-                const sRes = await fetch(`/status/${task_id}`);
-                const sData = await sRes.json();
-                if(sData.status === "done") {
-                    clearInterval(timer);
-                    render(sData.resultado);
-                } else if(sData.status === "error") {
-                    clearInterval(timer);
-                    alert("Erro: " + sData.erro);
-                    document.getElementById('loader').classList.add('hidden');
-                }
-            }, 4000);
-        }
-
-        function render(d) {
-            globalData = d;
-            document.getElementById('jurimetria').innerText = d.jurimetria;
-            document.getElementById('resumo_cliente').innerText = d.resumo_cliente;
+        texto_puro = response.text.strip()
+        if texto_puro.startswith("```json"):
+            texto_puro = texto_puro[7:]
+        elif texto_puro.startswith("```"):
+            texto_puro = texto_puro[3:]
+        if texto_puro.endswith("```"):
+            texto_puro = texto_puro[:-3]
             
-            const list = (id, arr) => {
-                const el = document.getElementById(id); el.innerHTML = '';
-                arr.forEach(i => el.innerHTML += `<li class="p-3 bg-white/5 rounded-lg border border-white/5"> ${i}</li>`);
-            };
-            list('analiseProvas', d.analise_provas);
-            list('vulnerabilidades', d.vulnerabilidades_contraparte);
-            list('listaLegal', d.base_legal);
-            list('listaJuris', d.jurisprudencia);
+        dados_json = json.loads(texto_puro.strip(), strict=False)
+        TASKS[task_id] = {"status": "done", "resultado": dados_json}
 
-            document.getElementById('loader').classList.add('hidden');
-            document.getElementById('results').classList.remove('hidden');
-        }
+    except Exception as e:
+        erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
+        TASKS[task_id] = {"status": "error", "erro": f"Erro interno ou formatação corrompida: {erro_seguro}"}
+    finally:
+        for f, m in arquivos_para_gemini:
+            if os.path.exists(f): os.remove(f)
 
-        async function baixarDossie() {
-            let texto = `DOSSIÊ DE INTELIGÊNCIA PROCESSUAL\n\n=== JURIMETRIA ===\n${globalData.jurimetria}\n\n=== AUDITORIA DE PROVAS ===\n${globalData.analise_provas.join('\n')}\n\n=== VULNERABILIDADES ===\n${globalData.vulnerabilidades_contraparte.join('\n')}`;
-            const res = await fetch('/gerar_docx', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ texto_total: texto })
-            });
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = "Dossie_Analitico.docx"; a.click();
-        }
-    </script>
-</body>
-</html>
+@app.post("/analisar")
+async def analisar_caso(
+    background_tasks: BackgroundTasks,
+    fatos_do_caso: str = Form(default=""),
+    area_direito: str = Form(default=""),
+    magistrado: str = Form(default=""),
+    tribunal: str = Form(default=""),
+    arquivos: Optional[List[UploadFile]] = File(default=[])
+):
+    fatos_limpos = unicodedata.normalize('NFC', fatos_do_caso) if fatos_do_caso else ""
+    mag_limpo = unicodedata.normalize('NFC', magistrado) if magistrado else ""
+    trib_limpo = unicodedata.normalize('NFC', tribunal) if tribunal else ""
+
+    if not fatos_limpos or len(fatos_limpos.strip()) < 5:
+        return JSONResponse(content={"erro": "Descreva os fatos."}, status_code=400)
+
+    task_id = str(uuid.uuid4())
+    TASKS[task_id] = {"status": "processing"}
+
+    arquivos_brutos = []
+    try:
+        if arquivos:
+            for arquivo in arquivos:
+                if not arquivo.filename: continue
+                ext = arquivo.filename.lower().split('.')[-1]
+                safe_name = f"doc_{uuid.uuid4().hex}.{ext}"
+                temp_input = f"temp_in_{safe_name}"
+                
+                with open(temp_input, "wb") as buffer:
+                    while True:
+                        chunk = await arquivo.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        buffer.write(chunk)
+                
+                arquivos_brutos.append((temp_input, ext, safe_name))
+                
+    except Exception as e:
+        return JSONResponse(content={"erro": "Erro de codificação ao salvar o arquivo."}, status_code=500)
+
+    background_tasks.add_task(processar_background, task_id, fatos_limpos, area_direito, mag_limpo, trib_limpo, arquivos_brutos)
+    
+    return JSONResponse(content={"task_id": task_id})
+
+@app.get("/status/{task_id}")
+def check_status(task_id: str):
+    task = TASKS.get(task_id)
+    if not task:
+        return JSONResponse(content={"status": "error", "erro": "Tarefa perdida."})
+    return JSONResponse(content=task)
+
+class DadosDocumento(BaseModel):
+    texto_documento: str
+    advogado_nome: Optional[str] = ""
+    advogado_oab: Optional[str] = ""
+    advogado_endereco: Optional[str] = ""
+
+@app.post("/gerar_docx")
+def gerar_docx(dados: DadosDocumento):
+    try:
+        doc = docx.Document()
+        for s in doc.sections:
+            s.top_margin, s.bottom_margin, s.left_margin, s.right_margin = Cm(3), Cm(2), Cm(3), Cm(2)
+
+        if dados.advogado_nome:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            run_h = p.add_run(f"{str(dados.advogado_nome).upper()}\nOAB: {dados.advogado_oab if dados.advogado_oab else '---'}\n{dados.advogado_endereco if dados.advogado_endereco else ''}")
+            run_h.font.size, run_h.font.name, run_h.italic = Pt(10), 'Times New Roman', True
+
+        for linha in dados.texto_documento.split('\n'):
+            if linha.strip():
+                para = doc.add_paragraph(linha.strip())
+                para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                para.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+                para.paragraph_format.first_line_indent = Cm(2.0)
+
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Dossie_Estrategico.docx"})
+    except Exception as e:
+        return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
