@@ -103,34 +103,23 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # Injeta o tempo real para forçar a atuação no presente
-        from datetime import datetime
-        data_hoje = datetime.now().strftime("%d/%m/%Y")
-
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
+        Concentre-se na análise técnica, doutrinária e jurisprudencial.
         
-        O PDF anexado representa o PASSADO (o histórico do processo). Você está atuando no PRESENTE (Hoje é {data_hoje}).
+        REGRA CRÍTICA: É ESTRITAMENTE PROIBIDO copiar ou transcrever as petições antigas do PDF. O PDF é apenas o histórico do caso.
+        O seu trabalho é redigir uma PEÇA NOVA, INÉDITA e com a DATA ATUAL (Ano Corrente), rebatendo o que está no PDF e usando os Fatos Novos.
         
-        A SUA MISSÃO SÃO DUAS ETAPAS INTEGRADAS:
-        
-        ETAPA 1: ANÁLISE (Os primeiros campos do JSON)
-        Analise o PDF e os FATOS NOVOS. Identifique as vulnerabilidades da contraparte, a base legal aplicável e a jurisprudência que destrói os argumentos adversos.
-        
-        ETAPA 2: A REDAÇÃO INÉDITA (O campo 'peca_processual')
-        Você DEVE redigir uma PEÇA PROCESSUAL TOTALMENTE NOVA (ex: Réplica, Memoriais, Recurso, etc) que represente o PRÓXIMO PASSO do processo.
-        
-        REGRAS ABSOLUTAS DE REDAÇÃO PARA NÃO SOFRER PENALIZAÇÃO:
-        1. PROIBIÇÃO DE PLÁGIO: É estritamente proibido transcrever ou imitar as petições antigas do PDF. Se você copiar o passado, a missão falha.
-        2. INTEGRAÇÃO DE INTELIGÊNCIA: A sua peça nova DEVE ser construída utilizando obrigatoriamente a base legal, a jurisprudência e as vulnerabilidades que VOCÊ MESMO listou na Etapa 1.
-        3. ASSINATURA CEGA: É proibido usar nomes de advogados que estão no PDF. Assine no final apenas com "[NOME DO ADVOGADO] - [OAB]".
-        
+        ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
+        Você DEVE redigir a NOVA PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
+        Inclua obrigatoriamente: Endereçamento correto, Qualificação completa, Dos Fatos, Do Direito, Dos Pedidos e Fecho formal.
+
         RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
         {{
             "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
             "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
             "base_legal": [], "jurisprudencia": [], "doutrina": [], 
-            "peca_processual": "TEXTO INTEGRAL DA PEÇA INÉDITA. Construa do zero, argumentando de forma letal com base nas teses e jurisprudências que você acabou de levantar nos campos acima."
+            "peca_processual": "TEXTO INTEGRAL E EXTENSO DA NOVA PEÇA AQUI..."
         }}
         """
         
