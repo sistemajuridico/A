@@ -80,22 +80,22 @@
 
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div class="lg:col-span-3 glass rounded-2xl p-6">
-                        <textarea id="fatosCaso" rows="8" class="w-full bg-transparent text-lg text-slate-200 outline-none resize-none font-serif" placeholder="Narre o caso, cole instruções ou suba mídias da audiência (áudio/vídeo)..."></textarea>
+                        <textarea id="fatosCaso" rows="8" class="w-full bg-transparent text-lg text-slate-200 outline-none resize-none font-serif" placeholder="Narre o caso ou cole instruções adicionais..."></textarea>
                     </div>
                     <div class="lg:col-span-1 flex flex-col gap-4">
                         <div class="flex-1 border-2 border-dashed border-slate-700 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:border-brand-500 transition-all" onclick="document.getElementById('arquivos').click()">
-                            <input type="file" id="arquivos" multiple accept=".pdf,audio/*,video/*" class="hidden" onchange="updateFileLabel()">
-                            <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-600 mb-2"></i>
-                            <p class="text-[10px] uppercase font-bold text-slate-500" id="fileLabel">Anexar Autos & Mídia</p>
+                            <input type="file" id="arquivos" multiple accept=".pdf" class="hidden" onchange="updateFileLabel()">
+                            <i class="fa-solid fa-file-pdf text-3xl text-slate-600 mb-2"></i>
+                            <p class="text-[10px] uppercase font-bold text-slate-500" id="fileLabel">Anexar Autos (PDF)</p>
                         </div>
-                        <button id="btnExecutar" onclick="processar()" class="btn-premium p-5 rounded-2xl font-bold text-white shadow-lg disabled:opacity-50">EXECUTAR ANÁLISE TOTAL</button>
+                        <button id="btnExecutar" onclick="processar()" class="btn-premium p-5 rounded-2xl font-bold text-white shadow-lg disabled:opacity-50">EXECUTAR ANÁLISE</button>
                     </div>
                 </div>
 
                 <div id="loader" class="hidden text-center py-10">
                     <div class="inline-block w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Inteligência Operando em Backstage...</p>
-                    <p class="text-[11px] text-slate-400 mt-2" id="loaderMsg">O ficheiro foi recebido com sucesso. A IA está a analisar. Pode demorar alguns minutos.</p>
+                    <p class="mt-4 text-brand-500 font-bold animate-pulse">Inteligência Estratégica Operando...</p>
+                    <p class="text-[11px] text-slate-400 mt-2" id="loaderMsg">A analisar os autos. Por favor, aguarde.</p>
                 </div>
 
                 <div id="results" class="hidden space-y-8 pb-20">
@@ -151,13 +151,6 @@
                         </div>
                     </div>
 
-                    <div class="glass rounded-3xl p-8 border border-brand-500/20 shadow-2xl">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="font-serif text-2xl text-white">Minuta Processual de Elite</h3>
-                            <button onclick="baixarDoc()" class="bg-white text-black px-6 py-3 rounded-xl font-bold text-xs hover:bg-brand-500 hover:text-white transition-all shadow-lg">BAIXAR APENAS PETIÇÃO</button>
-                        </div>
-                        <textarea id="peca" rows="20" class="w-full bg-deep/50 p-6 rounded-2xl text-sm font-serif leading-relaxed text-slate-400 border border-white/5 outline-none"></textarea>
-                    </div>
                 </div>
             </div>
         </div>
@@ -167,7 +160,7 @@
         let analiseGlobal = null; 
 
         function toggleMenu() { document.getElementById('sidebar').classList.toggle('hidden'); document.getElementById('sidebar').classList.toggle('flex'); }
-        function updateFileLabel() { const c = document.getElementById('arquivos').files.length; document.getElementById('fileLabel').innerText = c + " ARQUIVOS PRONTOS"; }
+        function updateFileLabel() { const c = document.getElementById('arquivos').files.length; document.getElementById('fileLabel').innerText = c + " PDF(s) PRONTOS"; }
 
         function mudarTab(tipo) {
             ['legal', 'juris', 'doutrina'].forEach(t => {
@@ -187,7 +180,6 @@
                 return;
             }
 
-            // LIMITE AUMENTADO PARA 100MB POR FICHEIRO
             const MAX_SIZE = 100 * 1024 * 1024; 
             const arquivosInput = document.getElementById('arquivos').files;
             
@@ -232,15 +224,10 @@
                     }
                 }
 
-                const contentType = res.headers.get("content-type");
-                if (!contentType || !contentType.includes("application/json")) {
-                    throw new Error("Erro de conexão na entrega do arquivo.");
-                }
-
                 const data = await res.json();
                 const taskId = data.task_id;
                 
-                loaderMsg.innerText = "Ficheiros recebidos! A Inteligência Artificial está a cruzar os dados. Isto não vai travar...";
+                loaderMsg.innerText = "Ficheiros recebidos! A Inteligência Artificial está a extrair os dados estratégicos...";
 
                 const checkInterval = setInterval(async () => {
                     try {
@@ -277,7 +264,6 @@
 
             document.getElementById('jurimetria').innerText = d.jurimetria || "Análise indisponível.";
             document.getElementById('resumo_cliente').innerText = d.resumo_cliente || "";
-            document.getElementById('peca').value = d.peca_processual || "";
 
             const tc = document.getElementById('timeline'); tc.innerHTML = '';
             (d.timeline || []).forEach(t => {
@@ -315,16 +301,6 @@
             alert("Texto copiado!"); 
         }
 
-        async function baixarDoc() {
-            const payload = {
-                texto_peca: document.getElementById('peca').value,
-                advogado_nome: document.getElementById('advNome').value,
-                advogado_oab: document.getElementById('advOAB').value,
-                advogado_endereco: document.getElementById('advEndereco').value
-            };
-            enviarParaServidorWord(payload, "MA_Minuta_Peticional.docx");
-        }
-
         async function baixarDossieCompleto() {
             if (!analiseGlobal) return;
             let tc = "M.A | JUS IA EXPERIENCE - DOSSIÊ ESTRATÉGICO COMPLETO\n\n";
@@ -357,7 +333,6 @@
                 tc += "=== REFERÊNCIAS DOUTRINÁRIAS ===\n";
                 analiseGlobal.doutrina.forEach(d => tc += `- ${d}\n`); tc += "\n";
             }
-            if(analiseGlobal.peca_processual) tc += "=== MINUTA DA PEÇA PROCESSUAL ===\n" + analiseGlobal.peca_processual + "\n\n";
 
             enviarParaServidorWord({
                 texto_peca: tc,
