@@ -5,6 +5,7 @@ import shutil
 import time
 import uuid
 import unicodedata
+import traceback
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
 from pydantic import BaseModel
@@ -36,6 +37,41 @@ TASKS = {}
 def serve_index():
     return FileResponse("index.html")
 
+@app.head("/")
+def ping_render():
+    """Responde ao 'Health Check' do Render para ele não matar o servidor"""
+    return JSONResponse(content={"status": "alive"})
+
+# --- FATIADOR AUTOMÁTICO DE PDFS GIGANTES ---
+def dividir_pdf_se_necessario(caminho_pdf, max_paginas=900):
+    """Garante que a Google não bloqueia PDFs com mais de 1000 páginas"""
+    import PyPDF2
+    arquivos_divididos = []
+    try:
+        with open(caminho_pdf, 'rb') as f:
+            reader = PyPDF2.PdfReader(f)
+            total_paginas = len(reader.pages)
+
+            if total_paginas <= max_paginas:
+                return [caminho_pdf] # Retorna o original se for pequeno
+
+            print(f"A dividir PDF gigante de {total_paginas} páginas...")
+            for i in range(0, total_paginas, max_paginas):
+                writer = PyPDF2.PdfWriter()
+                fim = min(i + max_paginas, total_paginas)
+                for j in range(i, fim):
+                    writer.add_page(reader.pages[j])
+
+                novo_nome = f"{caminho_pdf}_parte_{i//max_paginas + 1}.pdf"
+                with open(novo_nome, 'wb') as out_f:
+                    writer.write(out_f)
+                arquivos_divididos.append(novo_nome)
+                
+        return arquivos_divididos
+    except Exception as e:
+        print(f"Erro ao tentar dividir o PDF: {e}")
+        return [caminho_pdf] # Em caso de erro, tenta enviar o original
+
 def comprimir_video(input_path, output_path):
     try:
         from moviepy.editor import VideoFileClip
@@ -59,26 +95,31 @@ def comprimir_audio(input_path, output_path):
 def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: str, arquivos_brutos: list):
     arquivos_para_gemini = []
     try:
+        area = unicodedata.normalize('NFC', area)
+        mag = unicodedata.normalize('NFC', mag)
+        trib = unicodedata.normalize('NFC', trib)
+        fatos = unicodedata.normalize('NFC', fatos)
+
         for temp_input, ext, safe_name in arquivos_brutos:
-            target_file = temp_input
-            mime = "application/pdf"
-            
             if ext == "pdf": 
-                mime = "application/pdf"
+                # MÁGICA ACONTECE AQUI: Fatiamos o PDF antes de chegar no Google
+                pedacos = dividir_pdf_se_necessario(temp_input)
+                for pedaco in pedacos:
+                    arquivos_para_gemini.append((pedaco, "application/pdf"))
+                    
             elif ext in ["mp4", "mpeg", "mov", "avi"]:
-                mime = "video/mp4"
                 temp_output = f"comp_{safe_name}"
                 if comprimir_video(temp_input, temp_output):
-                    os.remove(temp_input)
-                    target_file = temp_output
+                    arquivos_para_gemini.append((temp_output, "video/mp4"))
+                else:
+                    arquivos_para_gemini.append((temp_input, "video/mp4"))
+                    
             elif ext in ["mp3", "wav", "m4a", "ogg"]:
-                mime = "audio/mp3"
                 temp_output = f"comp_{safe_name}"
                 if comprimir_audio(temp_input, temp_output):
-                    os.remove(temp_input)
-                    target_file = temp_output
-                    
-            arquivos_para_gemini.append((target_file, mime))
+                    arquivos_para_gemini.append((temp_output, "audio/mp3"))
+                else:
+                    arquivos_para_gemini.append((temp_input, "audio/mp3"))
 
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
@@ -103,23 +144,34 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
+        # --- NOVA ARQUITETURA MENTAL (CHAIN OF THOUGHT) ---
         instrucoes = f"""
-        Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
-        Concentre-se na análise técnica, doutrinária e jurisprudencial.
+        Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Estrategista Processual. Especialidade: {area}.
         
-        REGRA CRÍTICA: É ESTRITAMENTE PROIBIDO copiar ou transcrever as petições antigas do PDF. O PDF é apenas o histórico do caso.
-        O seu trabalho é redigir uma PEÇA NOVA, INÉDITA e com a DATA ATUAL (Ano Corrente), rebatendo o que está no PDF e usando os Fatos Novos.
+        MUDANÇA DE ARQUITETURA MENTAL (CHAIN OF THOUGHT):
+        Você não é um mero gerador de texto. O seu processo mental OBRIGATÓRIO deve seguir esta ordem exata:
         
-        ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
-        Você DEVE redigir a NOVA PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
-        Inclua obrigatoriamente: Endereçamento correto, Qualificação completa, Dos Fatos, Do Direito, Dos Pedidos e Fecho formal.
+        PASSO 1: DIAGNÓSTICO. Analise os fatos e documentos. Crie um resumo estratégico focado no "calcanhar de Aquiles" do caso.
+        PASSO 2: MODO COMBATE (FRAQUEZAS). Identifique meticulosamente todas as vulnerabilidades, contradições, prescrições ou teses fracas da contraparte.
+        PASSO 3: ARSENAL JURÍDICO. Reúna a base legal, a jurisprudência e a doutrina que atacam EXATAMENTE as fraquezas encontradas no Passo 2.
+        PASSO 4: A PEÇA DE RESISTÊNCIA. APENAS APÓS concluir os passos 1, 2 e 3, você irá redigir a PEÇA PROCESSUAL. A peça não pode ser genérica. Ela DEVE OBRIGATORIAMENTE usar como munição todas as fraquezas e jurisprudências que você levantou nos passos anteriores para aniquilar a tese adversária.
+        
+        REGRA CRÍTICA: É ESTRITAMENTE PROIBIDO copiar ou transcrever as petições antigas do PDF. O PDF é apenas o histórico. O seu trabalho é redigir uma PEÇA NOVA, INÉDITA e com a DATA ATUAL, rebatendo o que está no PDF e usando os Fatos Novos.
+        
+        ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. Você DEVE redigir a NOVA PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO (Endereçamento, Qualificação, Dos Fatos, Do Direito, Dos Pedidos e Fecho).
 
-        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
+        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA E ORDEM MENTAL:
         {{
-            "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
-            "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
-            "base_legal": [], "jurisprudencia": [], "doutrina": [], 
-            "peca_processual": "TEXTO INTEGRAL E EXTENSO DA NOVA PEÇA AQUI..."
+            "resumo_estrategico": "A sua tese principal (Passo 1)",
+            "vulnerabilidades_contraparte": ["Fraqueza 1...", "Fraqueza 2... (Passo 2)"],
+            "base_legal": ["Artigos essenciais... (Passo 3)"],
+            "jurisprudencia": ["Julgados que atacam a contraparte... (Passo 3)"],
+            "doutrina": ["Entendimento doutrinário... (Passo 3)"],
+            "jurimetria": "Tendências do juízo",
+            "timeline": ["Cronologia..."],
+            "checklist": ["Providências práticas..."],
+            "resumo_cliente": "Explicação leiga...",
+            "peca_processual": "A NOVA PETIÇÃO COMPLETA E EXTENSA, CONSTRUÍDA COM AS ARMAS DOS PASSOS ANTERIORES (Passo 4)..."
         }}
         """
         
@@ -171,11 +223,22 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
 
     except Exception as e:
-        erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
-        TASKS[task_id] = {"status": "error", "erro": f"{erro_seguro}"}
+        print("=== DETALHE DO ERRO ===")
+        print(traceback.format_exc())
+        erro_seguro = str(e).encode('ascii', 'replace').decode('ascii')
+        
+        if "INVALID_ARGUMENT" in erro_seguro.upper() or "400" in erro_seguro:
+            mensagem = "Erro 400 (Invalid Argument): A formatação do documento não é suportada ou o ficheiro está protegido por palavra-passe."
+        else:
+            mensagem = f"Erro na IA: {erro_seguro}"
+            
+        TASKS[task_id] = {"status": "error", "erro": mensagem}
     finally:
+        # Limpeza total para não acumular "lixo" no servidor Render
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
+        for temp_input, ext, safe_name in arquivos_brutos:
+            if os.path.exists(temp_input): os.remove(temp_input)
 
 @app.post("/analisar")
 async def analisar_caso(
@@ -215,7 +278,7 @@ async def analisar_caso(
                 arquivos_brutos.append((temp_input, ext, safe_name))
                 
     except Exception as e:
-        return JSONResponse(content={"erro": "Erro de codificação ao salvar o arquivo."}, status_code=500)
+        return JSONResponse(content={"erro": "Erro de codificação ao salvar o ficheiro."}, status_code=500)
 
     background_tasks.add_task(processar_background, task_id, fatos_limpos, area_direito, mag_limpo, trib_limpo, arquivos_brutos)
     
@@ -225,7 +288,7 @@ async def analisar_caso(
 def check_status(task_id: str):
     task = TASKS.get(task_id)
     if not task:
-        return JSONResponse(content={"status": "error", "erro": "Tarefa perdida."})
+        return JSONResponse(content={"status": "error", "erro": "Tarefa perdida pelo servidor (Render reiniciou a máquina). Tente novamente."})
     return JSONResponse(content=task)
 
 class DadosPeca(BaseModel):
@@ -259,4 +322,4 @@ def gerar_docx(dados: DadosPeca):
         buffer.seek(0)
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
-        return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
+        return JSONResponse(content={"erro": "Erro na geração do ficheiro Word."}, status_code=500)
