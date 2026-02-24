@@ -103,32 +103,37 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # --- A DIRETRIZ SUPREMA (SYSTEM INSTRUCTION) ---
+       # --- A DIRETRIZ SUPREMA (SYSTEM INSTRUCTION) ---
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         
         REGRA DE OURO E INEGOCIÁVEL: O documento PDF enviado é APENAS MATERIAL DE CONSULTA (histórico do processo).
         VOCÊ ESTÁ TERMINANTEMENTE PROIBIDO DE COPIAR, TRANSCREVER OU REAPROVEITAR QUALQUER PETIÇÃO, RECURSO OU MANIFESTAÇÃO QUE JÁ EXISTA DENTRO DO PDF.
-        Se você copiar o texto de uma apelação, defesa ou petição que já está no PDF, você falhará gravemente.
 
-        ARQUITETURA DE PENSAMENTO (SIGA ESTA ORDEM PARA PREENCHER O JSON):
-        1. Leia o PDF e extraia apenas os fatos crus.
-        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte' mapeando o cenário e encontrando as falhas do processo.
-        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina' criando um arsenal inédito contra essas falhas.
-        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, atendendo ao comando passado em "FATOS NOVOS E DIRECIONAMENTO". 
-        - Você deve OBRIGATORIAMENTE usar as teses (jurisprudência e falhas) que você mesmo acabou de listar nos campos anteriores da sua análise.
-        - A peça deve ser COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO (Endereçamento correto ao juízo, Qualificação, Dos Fatos, Do Direito, Dos Pedidos, Fecho formal).
+        ARQUITETURA DE PENSAMENTO (SIGA ESTA ORDEM):
+        1. Leia o PDF e extraia os fatos crus.
+        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte'.
+        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
+        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, atendendo ao comando passado em "FATOS NOVOS E DIRECIONAMENTO". Use as teses mapeadas.
 
-        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
+        REGRAS CRÍTICAS DE FORMATAÇÃO JSON (EVITE ERRO UNTERMINATED STRING):
+        - O retorno deve ser um JSON VÁLIDO.
+        - É ESTRITAMENTE PROIBIDO usar quebras de linha reais (Enter/Return) dentro dos valores do JSON.
+        - Para quebrar linhas ou criar parágrafos na 'peca_processual', use APENAS caracteres de escape: '\\n' ou '\\n\\n'.
+        - Se precisar usar aspas duplas dentro do texto, escape-as assim: \\"texto\\".
+
+        RETORNE ESTRITAMENTE NESTA ESTRUTURA JSON:
         {{
-            "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
+            "resumo_estrategico": "...", 
+            "jurimetria": "...", 
+            "resumo_cliente": "...",
             "timeline": [{{"data": "...", "evento": "..."}}], 
             "vulnerabilidades_contraparte": ["...", "..."], 
             "checklist": ["...", "..."],
             "base_legal": ["...", "..."], 
             "jurisprudencia": ["...", "..."], 
             "doutrina": ["...", "..."], 
-            "peca_processual": "TEXTO INTEGRAL E EXTENSO DA NOVA PEÇA AQUI..."
+            "peca_processual": "TEXTO DA PEÇA...\\n\\nNOVO PARÁGRAFO...\\n\\nMAIS TEXTO..."
         }}
         """
         
@@ -277,3 +282,4 @@ def gerar_docx(dados: DadosPeca):
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
         return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
+
