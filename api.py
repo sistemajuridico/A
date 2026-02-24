@@ -57,7 +57,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             if ext == "pdf": 
                 arquivos_para_gemini.append((temp_input, "application/pdf"))
             else:
-                os.remove(temp_input) # Descarta não-PDFs
+                os.remove(temp_input) 
 
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
@@ -82,23 +82,20 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
+        # O prompt agora foca APENAS na análise jurídica. Nada de regras chatas de programação.
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Consultor Estratégico. Especialidade: {area}.
         
-        REGRA DE OURO E INEGOCIÁVEL: O documento PDF enviado é APENAS MATERIAL DE CONSULTA.
+        REGRA DE OURO: O documento PDF enviado é APENAS MATERIAL DE CONSULTA.
         
         ARQUITETURA DE PENSAMENTO:
         1. Leia o PDF e extraia os fatos crus e nuances do caso.
-        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte'.
-        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
-        4. O seu objetivo é EXCLUSIVAMENTE fornecer um mapeamento processual, jurimetria e estratégia de combate. NÃO redija minutas processuais.
-
-        REGRAS ABSOLUTAS DE FORMATAÇÃO JSON:
-        - DEVOLVA EXATAMENTE E APENAS UM JSON VÁLIDO.
-        - PROIBIDO usar aspas duplas (" ") DENTRO dos seus textos. Troque QUALQUER aspas duplas por aspas simples (' ').
+        2. Preencha o resumo_estrategico, timeline e vulnerabilidades_contraparte.
+        3. Preencha a base_legal, jurisprudencia e doutrina.
+        4. O seu objetivo é EXCLUSIVAMENTE fornecer um mapeamento processual, jurimetria e estratégia de combate.
         """
         
-        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia analítica e preencha os dados no JSON."
+        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia analítica completa do caso."
 
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
@@ -111,9 +108,10 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
+        # Configuração delegando 100% da formatação para a SDK do Google
         config_ia_kwargs = dict(
             system_instruction=instrucao_sistema,
-            temperature=0.2, 
+            temperature=0.3, 
             max_output_tokens=8192, 
             response_mime_type="application/json",
             response_schema=SchemaRespostaIA, 
@@ -131,35 +129,22 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             config=config_ia
         )
 
-        if getattr(response, 'text', None) is None:
-            motivo = "A Google bloqueou a resposta silenciosamente."
-            if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
-                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial: {response.candidates[0].finish_reason}"
-            raise Exception(motivo)
-
-        texto_puro = response.text.strip()
-        
-        if texto_puro.startswith("```json"):
-            texto_puro = texto_puro[7:]
-        elif texto_puro.startswith("```"):
-            texto_puro = texto_puro[3:]
-        if texto_puro.endswith("```"):
-            texto_puro = texto_puro[:-3]
-            
-        texto_puro = texto_puro.strip()
-        
-        # --- O ROLO COMPRESSOR (FORÇA BRUTA) ---
-        # Varre todo o texto da resposta e destrói quebras de linha físicas e tabulações, 
-        # transformando o JSON inteiro em uma única linha contínua e inquebrável.
-        texto_puro = texto_puro.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
-        
-        try:
-            dados_json = json.loads(texto_puro, strict=False)
+        # Parse Inteligente: Tenta usar o objeto Pydantic validado nativamente pela Google
+        if getattr(response, 'parsed', None) is not None:
+            dados_json = response.parsed.model_dump()
             TASKS[task_id] = {"status": "done", "resultado": dados_json}
-        except json.JSONDecodeError as e:
-            posicao_erro = e.pos
-            recorte_erro = texto_puro[max(0, posicao_erro - 40):posicao_erro + 40]
-            raise Exception(f"Erro persistente na formatação gerada pela IA. Trecho: [... {recorte_erro} ...]")
+        else:
+            # Fallback seguro caso o parsed não retorne
+            texto_puro = response.text.strip()
+            if texto_puro.startswith("```json"):
+                texto_puro = texto_puro[7:]
+            elif texto_puro.startswith("```"):
+                texto_puro = texto_puro[3:]
+            if texto_puro.endswith("```"):
+                texto_puro = texto_puro[:-3]
+                
+            dados_json = json.loads(texto_puro.strip(), strict=False)
+            TASKS[task_id] = {"status": "done", "resultado": dados_json}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
