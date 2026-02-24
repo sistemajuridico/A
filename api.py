@@ -15,7 +15,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
-# --- SCHEMAS PYDANTIC (A BALA DE PRATA PARA O JSON) ---
+# --- SCHEMAS PYDANTIC (AGORA COM O TRUQUE DO ARRAY) ---
 class SchemaTimeline(BaseModel):
     data: str
     evento: str
@@ -30,7 +30,7 @@ class SchemaRespostaIA(BaseModel):
     base_legal: List[str]
     jurisprudencia: List[str]
     doutrina: List[str]
-    peca_processual: str
+    peca_processual: List[str] # <-- A MÁGICA: A IA vai gerar uma lista de parágrafos
 
 app = FastAPI()
 
@@ -120,29 +120,31 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # --- A DIRETRIZ SUPREMA (SYSTEM INSTRUCTION) ---
+        # --- A DIRETRIZ SUPREMA (COM BLINDAGEM DE JSON) ---
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         
-        REGRA DE OURO E INEGOCIÁVEL: O documento PDF enviado é APENAS MATERIAL DE CONSULTA (histórico do processo).
-        VOCÊ ESTÁ TERMINANTEMENTE PROIBIDO DE COPIAR, TRANSCREVER OU REAPROVEITAR QUALQUER PETIÇÃO, RECURSO OU MANIFESTAÇÃO QUE JÁ EXISTA DENTRO DO PDF.
+        REGRA DE OURO E INEGOCIÁVEL: O documento PDF enviado é APENAS MATERIAL DE CONSULTA.
+        VOCÊ ESTÁ TERMINANTEMENTE PROIBIDO DE COPIAR OU TRANSCREVER PEÇAS EXISTENTES NO PDF.
 
         ARQUITETURA DE PENSAMENTO (SIGA ESTA ORDEM):
         1. Leia o PDF e extraia os fatos crus.
-        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte' mapeando o cenário e as falhas processuais.
-        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina' criando um arsenal inédito contra essas falhas.
-        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, atendendo ao comando passado em "FATOS NOVOS E DIRECIONAMENTO". Use obrigatoriamente as teses mapeadas.
-        A peça deve ser COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO (Endereçamento, Qualificação, Dos Fatos, Do Direito, Dos Pedidos, Fecho formal).
+        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte'.
+        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
+        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, usando as teses mapeadas.
+
+        REGRA ABSOLUTA DE FORMATAÇÃO (ANTI-ERRO JSON):
+        - O campo 'peca_processual' DEVE SER UM ARRAY DE STRINGS (uma lista).
+        - Cada parágrafo, título ou linha da sua petição DEVE ser um item separado na lista.
+        - NUNCA use aspas duplas (" ") dentro do texto das suas respostas, substitua SEMPRE por aspas simples (' ').
         """
         
-        # O prompt vira o comando imediato do advogado
-        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia e redija a NOVA peça baseada nestes direcionamentos e no histórico do PDF."
+        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia e redija a NOVA peça baseada nestes direcionamentos."
 
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
         prompt_partes.append(prompt_comando)
 
-        # --- A VACINA DOS FILTROS ---
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
             types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
@@ -150,13 +152,12 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
-        # --- CONFIGURAÇÃO BLINDADA COM SCHEMA PYDANTIC ---
         config_ia_kwargs = dict(
             system_instruction=instrucao_sistema,
-            temperature=0.35, # Temperatura ideal: fluidez sem alucinação
-            max_output_tokens=8192, # Evita o corte da petição (limite máximo)
+            temperature=0.35, 
+            max_output_tokens=8192, 
             response_mime_type="application/json",
-            response_schema=SchemaRespostaIA, # O molde obrigatório Pydantic
+            response_schema=SchemaRespostaIA, 
             safety_settings=filtros_seguranca
         )
         
@@ -171,31 +172,35 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             config=config_ia
         )
 
-        # --- A REDE DE PROTEÇÃO CONTRA O NONETYPE ---
         if getattr(response, 'text', None) is None:
             motivo = "A Google bloqueou a resposta silenciosamente."
             if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
-                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial da Google: {response.candidates[0].finish_reason}"
+                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial: {response.candidates[0].finish_reason}"
             raise Exception(motivo)
 
-        # --- LIMPEZA DE STRING E LEITURA TOLERANTE ---
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
             texto_puro = texto_puro[7:]
         elif texto_puro.startswith("```"):
             texto_puro = texto_puro[3:]
-            
         if texto_puro.endswith("```"):
             texto_puro = texto_puro[:-3]
             
         texto_puro = texto_puro.strip()
         
-        # O strict=False perdoa quebras de linha e tabs soltos dentro do JSON gerado
-        TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro, strict=False)}
+        # Leitura tolerante
+        dados_json = json.loads(texto_puro, strict=False)
+        
+        # --- A RECONSTRUÇÃO DO TEXTO ---
+        # Se a IA cuspiu a petição em formato de lista (parágrafos separados), nós juntamos tudo com quebras de linha aqui!
+        if isinstance(dados_json.get('peca_processual'), list):
+            dados_json['peca_processual'] = '\n\n'.join(dados_json['peca_processual'])
+
+        TASKS[task_id] = {"status": "done", "resultado": dados_json}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
-        TASKS[task_id] = {"status": "error", "erro": f"{erro_seguro}"}
+        TASKS[task_id] = {"status": "error", "erro": f"Erro interno ou formatação corrompida: {erro_seguro}"}
     finally:
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
