@@ -15,6 +15,23 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
+# --- SCHEMAS PYDANTIC (A BALA DE PRATA PARA O JSON) ---
+class SchemaTimeline(BaseModel):
+    data: str
+    evento: str
+
+class SchemaRespostaIA(BaseModel):
+    resumo_estrategico: str
+    jurimetria: str
+    resumo_cliente: str
+    timeline: List[SchemaTimeline]
+    vulnerabilidades_contraparte: List[str]
+    checklist: List[str]
+    base_legal: List[str]
+    jurisprudencia: List[str]
+    doutrina: List[str]
+    peca_processual: str
+
 app = FastAPI()
 
 MAX_UPLOAD_SIZE = 300 * 1024 * 1024  
@@ -103,7 +120,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-       # --- A DIRETRIZ SUPREMA (SYSTEM INSTRUCTION) ---
+        # --- A DIRETRIZ SUPREMA (SYSTEM INSTRUCTION) ---
         instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         
@@ -112,29 +129,10 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
 
         ARQUITETURA DE PENSAMENTO (SIGA ESTA ORDEM):
         1. Leia o PDF e extraia os fatos crus.
-        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte'.
-        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
-        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, atendendo ao comando passado em "FATOS NOVOS E DIRECIONAMENTO". Use as teses mapeadas.
-
-        REGRAS CRÍTICAS DE FORMATAÇÃO JSON (EVITE ERRO UNTERMINATED STRING):
-        - O retorno deve ser um JSON VÁLIDO.
-        - É ESTRITAMENTE PROIBIDO usar quebras de linha reais (Enter/Return) dentro dos valores do JSON.
-        - Para quebrar linhas ou criar parágrafos na 'peca_processual', use APENAS caracteres de escape: '\\n' ou '\\n\\n'.
-        - Se precisar usar aspas duplas dentro do texto, escape-as assim: \\"texto\\".
-
-        RETORNE ESTRITAMENTE NESTA ESTRUTURA JSON:
-        {{
-            "resumo_estrategico": "...", 
-            "jurimetria": "...", 
-            "resumo_cliente": "...",
-            "timeline": [{{"data": "...", "evento": "..."}}], 
-            "vulnerabilidades_contraparte": ["...", "..."], 
-            "checklist": ["...", "..."],
-            "base_legal": ["...", "..."], 
-            "jurisprudencia": ["...", "..."], 
-            "doutrina": ["...", "..."], 
-            "peca_processual": "TEXTO DA PEÇA...\\n\\nNOVO PARÁGRAFO...\\n\\nMAIS TEXTO..."
-        }}
+        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte' mapeando o cenário e as falhas processuais.
+        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina' criando um arsenal inédito contra essas falhas.
+        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, atendendo ao comando passado em "FATOS NOVOS E DIRECIONAMENTO". Use obrigatoriamente as teses mapeadas.
+        A peça deve ser COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO (Endereçamento, Qualificação, Dos Fatos, Do Direito, Dos Pedidos, Fecho formal).
         """
         
         # O prompt vira o comando imediato do advogado
@@ -152,24 +150,20 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
-        # --- CONFIGURAÇÃO OTIMIZADA (TEMPERATURA E TOKENS) ---
-        if len(conteudos_multimais) > 0:
-            config_ia = types.GenerateContentConfig(
-                system_instruction=instrucao_sistema,
-                temperature=0.35, # Temperatura ideal: fluidez sem alucinação
-                max_output_tokens=8192, # Evita o corte da petição (limite máximo do Flash)
-                response_mime_type="application/json",
-                safety_settings=filtros_seguranca
-            )
-        else:
-            config_ia = types.GenerateContentConfig(
-                system_instruction=instrucao_sistema,
-                temperature=0.35,
-                max_output_tokens=8192,
-                response_mime_type="application/json",
-                tools=[{"googleSearch": {}}],
-                safety_settings=filtros_seguranca
-            )
+        # --- CONFIGURAÇÃO BLINDADA COM SCHEMA PYDANTIC ---
+        config_ia_kwargs = dict(
+            system_instruction=instrucao_sistema,
+            temperature=0.35, # Temperatura ideal: fluidez sem alucinação
+            max_output_tokens=8192, # Evita o corte da petição (limite máximo)
+            response_mime_type="application/json",
+            response_schema=SchemaRespostaIA, # O molde obrigatório Pydantic
+            safety_settings=filtros_seguranca
+        )
+        
+        if len(conteudos_multimais) == 0:
+            config_ia_kwargs["tools"] = [{"googleSearch": {}}]
+            
+        config_ia = types.GenerateContentConfig(**config_ia_kwargs)
 
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
@@ -184,13 +178,20 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 motivo = f"A IA recusou-se a gerar o texto. Motivo oficial da Google: {response.candidates[0].finish_reason}"
             raise Exception(motivo)
 
+        # --- LIMPEZA DE STRING E LEITURA TOLERANTE ---
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
-            texto_puro = texto_puro.replace("```json", "", 1)
-        if texto_puro.endswith("```"):
-            texto_puro = texto_puro.rsplit("```", 1)[0]
+            texto_puro = texto_puro[7:]
+        elif texto_puro.startswith("```"):
+            texto_puro = texto_puro[3:]
             
-        TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
+        if texto_puro.endswith("```"):
+            texto_puro = texto_puro[:-3]
+            
+        texto_puro = texto_puro.strip()
+        
+        # O strict=False perdoa quebras de linha e tabs soltos dentro do JSON gerado
+        TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro, strict=False)}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
@@ -282,4 +283,3 @@ def gerar_docx(dados: DadosPeca):
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
         return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
-
