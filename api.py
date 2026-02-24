@@ -15,6 +15,23 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from google import genai
 from google.genai import types
 
+# --- SCHEMAS PYDANTIC (AGORA COM O TRUQUE DO ARRAY) ---
+class SchemaTimeline(BaseModel):
+    data: str
+    evento: str
+
+class SchemaRespostaIA(BaseModel):
+    resumo_estrategico: str
+    jurimetria: str
+    resumo_cliente: str
+    timeline: List[SchemaTimeline]
+    vulnerabilidades_contraparte: List[str]
+    checklist: List[str]
+    base_legal: List[str]
+    jurisprudencia: List[str]
+    doutrina: List[str]
+    peca_processual: List[str] # <-- A MÁGICA: A IA vai gerar uma lista de parágrafos
+
 app = FastAPI()
 
 MAX_UPLOAD_SIZE = 300 * 1024 * 1024  
@@ -103,31 +120,31 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        instrucoes = f"""
+        # --- A DIRETRIZ SUPREMA (COM BLINDAGEM DE JSON) ---
+        instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
-        Concentre-se na análise técnica, doutrinária e jurisprudencial.
         
-        REGRA CRÍTICA: É ESTRITAMENTE PROIBIDO copiar ou transcrever as petições antigas do PDF. O PDF é apenas o histórico do caso.
-        O seu trabalho é redigir uma PEÇA NOVA, INÉDITA e com a DATA ATUAL (Ano Corrente), rebatendo o que está no PDF e usando os Fatos Novos.
-        
-        ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
-        Você DEVE redigir a NOVA PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
-        Inclua obrigatoriamente: Endereçamento correto, Qualificação completa, Dos Fatos, Do Direito, Dos Pedidos e Fecho formal.
+        REGRA DE OURO E INEGOCIÁVEL: O documento PDF enviado é APENAS MATERIAL DE CONSULTA.
+        VOCÊ ESTÁ TERMINANTEMENTE PROIBIDO DE COPIAR OU TRANSCREVER PEÇAS EXISTENTES NO PDF.
 
-        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
-        {{
-            "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
-            "timeline": [], "vulnerabilidades_contraparte": [], "checklist": [],
-            "base_legal": [], "jurisprudencia": [], "doutrina": [], 
-            "peca_processual": "TEXTO INTEGRAL E EXTENSO DA NOVA PEÇA AQUI..."
-        }}
+        ARQUITETURA DE PENSAMENTO (SIGA ESTA ORDEM):
+        1. Leia o PDF e extraia os fatos crus.
+        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte'.
+        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina'.
+        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, usando as teses mapeadas.
+
+        REGRA ABSOLUTA DE FORMATAÇÃO (ANTI-ERRO JSON):
+        - O campo 'peca_processual' DEVE SER UM ARRAY DE STRINGS (uma lista).
+        - Cada parágrafo, título ou linha da sua petição DEVE ser um item separado na lista.
+        - NUNCA use aspas duplas (" ") dentro do texto das suas respostas, substitua SEMPRE por aspas simples (' ').
         """
         
+        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia e redija a NOVA peça baseada nestes direcionamentos."
+
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
-        prompt_partes.append(f"{instrucoes}\n\nFATOS (CRIAR PEÇA NOVA COM BASE NISTO):\n{fatos}")
+        prompt_partes.append(prompt_comando)
 
-        # --- A VACINA DOS FILTROS (Permite analisar crimes, litígios e afins sem a Google bloquear) ---
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
             types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
@@ -135,19 +152,19 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
-        if len(conteudos_multimais) > 0:
-            config_ia = types.GenerateContentConfig(
-                temperature=0.1,
-                response_mime_type="application/json",
-                safety_settings=filtros_seguranca
-            )
-        else:
-            config_ia = types.GenerateContentConfig(
-                temperature=0.1, 
-                response_mime_type="application/json",
-                tools=[{"googleSearch": {}}],
-                safety_settings=filtros_seguranca
-            )
+        config_ia_kwargs = dict(
+            system_instruction=instrucao_sistema,
+            temperature=0.35, 
+            max_output_tokens=8192, 
+            response_mime_type="application/json",
+            response_schema=SchemaRespostaIA, 
+            safety_settings=filtros_seguranca
+        )
+        
+        if len(conteudos_multimais) == 0:
+            config_ia_kwargs["tools"] = [{"googleSearch": {}}]
+            
+        config_ia = types.GenerateContentConfig(**config_ia_kwargs)
 
         response = client.models.generate_content(
             model='gemini-2.5-flash', 
@@ -155,24 +172,35 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             config=config_ia
         )
 
-        # --- A REDE DE PROTEÇÃO CONTRA O NONETYPE ---
         if getattr(response, 'text', None) is None:
             motivo = "A Google bloqueou a resposta silenciosamente."
             if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
-                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial da Google: {response.candidates[0].finish_reason}"
+                motivo = f"A IA recusou-se a gerar o texto. Motivo oficial: {response.candidates[0].finish_reason}"
             raise Exception(motivo)
 
         texto_puro = response.text.strip()
         if texto_puro.startswith("```json"):
-            texto_puro = texto_puro.replace("```json", "", 1)
+            texto_puro = texto_puro[7:]
+        elif texto_puro.startswith("```"):
+            texto_puro = texto_puro[3:]
         if texto_puro.endswith("```"):
-            texto_puro = texto_puro.rsplit("```", 1)[0]
+            texto_puro = texto_puro[:-3]
             
-        TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
+        texto_puro = texto_puro.strip()
+        
+        # Leitura tolerante
+        dados_json = json.loads(texto_puro, strict=False)
+        
+        # --- A RECONSTRUÇÃO DO TEXTO ---
+        # Se a IA cuspiu a petição em formato de lista (parágrafos separados), nós juntamos tudo com quebras de linha aqui!
+        if isinstance(dados_json.get('peca_processual'), list):
+            dados_json['peca_processual'] = '\n\n'.join(dados_json['peca_processual'])
+
+        TASKS[task_id] = {"status": "done", "resultado": dados_json}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
-        TASKS[task_id] = {"status": "error", "erro": f"{erro_seguro}"}
+        TASKS[task_id] = {"status": "error", "erro": f"Erro interno ou formatação corrompida: {erro_seguro}"}
     finally:
         for f, m in arquivos_para_gemini:
             if os.path.exists(f): os.remove(f)
