@@ -103,14 +103,12 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        # A INJEÇÃO DE PSICOLOGIA DE IA (PROMPT ENGINEERING DE ELITE)
         instrucoes = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
+        Concentre-se na análise técnica, doutrinária e jurisprudencial.
         
-        REGRAS DE OURO ABSOLUTAS:
-        1. É ESTRITAMENTE PROIBIDO copiar, transcrever ou reproduzir as peças processuais que já estão no PDF. O PDF serve apenas para leitura e contexto histórico.
-        2. O seu trabalho é criar uma PEÇA NOVA, INÉDITA e ATUALIZADA com base nos 'FATOS NOVOS' informados para dar o próximo passo no processo (ex: Réplica, Recurso, Nova Inicial).
-        3. Aja no presente. Use a data atual (ano corrente).
+        REGRA CRÍTICA: É ESTRITAMENTE PROIBIDO copiar ou transcrever as petições antigas do PDF. O PDF é apenas o histórico do caso.
+        O seu trabalho é redigir uma PEÇA NOVA, INÉDITA e com a DATA ATUAL (Ano Corrente), rebatendo o que está no PDF e usando os Fatos Novos.
         
         ATENÇÃO MÁXIMA PARA A PEÇA PROCESSUAL: No campo 'peca_processual', você é PROIBIDO de resumir. 
         Você DEVE redigir a NOVA PETIÇÃO COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO. 
@@ -127,8 +125,9 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
-        prompt_partes.append(f"{instrucoes}\n\nFATOS NOVOS (CRIAR PEÇA COM BASE NISTO):\n{fatos}")
+        prompt_partes.append(f"{instrucoes}\n\nFATOS (CRIAR PEÇA NOVA COM BASE NISTO):\n{fatos}")
 
+        # --- A VACINA DOS FILTROS (Permite analisar crimes, litígios e afins sem a Google bloquear) ---
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
             types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
@@ -139,14 +138,12 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if len(conteudos_multimais) > 0:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1,
-                max_output_tokens=8192,
                 response_mime_type="application/json",
                 safety_settings=filtros_seguranca
             )
         else:
             config_ia = types.GenerateContentConfig(
                 temperature=0.1, 
-                max_output_tokens=8192,
                 response_mime_type="application/json",
                 tools=[{"googleSearch": {}}],
                 safety_settings=filtros_seguranca
@@ -158,6 +155,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             config=config_ia
         )
 
+        # --- A REDE DE PROTEÇÃO CONTRA O NONETYPE ---
         if getattr(response, 'text', None) is None:
             motivo = "A Google bloqueou a resposta silenciosamente."
             if hasattr(response, 'candidates') and response.candidates and hasattr(response.candidates[0], 'finish_reason'):
@@ -170,24 +168,7 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
         if texto_puro.endswith("```"):
             texto_puro = texto_puro.rsplit("```", 1)[0]
             
-        # --- A REDE DE PROTEÇÃO CONTRA FALHAS NO JSON (O Plano B) ---
-        try:
-            resultado_final = json.loads(texto_puro.strip())
-        except Exception as erro_json:
-            resultado_final = {
-                "resumo_estrategico": "A IA escreveu um texto gigantesco e perdeu o alinhamento dos painéis, mas o seu documento foi salvo! Role a página até ao fundo.",
-                "jurimetria": "Formatação corrompida. O texto está em baixo.",
-                "resumo_cliente": "Formatação corrompida.",
-                "timeline": [{"data": "HOJE", "evento": "Análise Bruta Concluída"}],
-                "vulnerabilidades_contraparte": ["Recuperação de texto bruto ativada."],
-                "checklist": [],
-                "base_legal": [],
-                "jurisprudencia": [],
-                "doutrina": [],
-                "peca_processual": texto_puro.strip() # Salva a petição custe o que custar!
-            }
-            
-        TASKS[task_id] = {"status": "done", "resultado": resultado_final}
+        TASKS[task_id] = {"status": "done", "resultado": json.loads(texto_puro.strip())}
 
     except Exception as e:
         erro_seguro = str(e).encode('ascii', 'ignore').decode('ascii')
