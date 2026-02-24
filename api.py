@@ -103,40 +103,43 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
                 types.Part.from_uri(file_uri=f_info.uri, mime_type=mime)
             )
 
-        instrucoes = f"""
+        # --- A DIRETRIZ SUPREMA (SYSTEM INSTRUCTION) ---
+        instrucao_sistema = f"""
         Você é o M.A | JUS IA EXPERIENCE, um Advogado de Elite e Doutrinador. Especialidade: {area}.
         
-        ARQUITETURA DE PENSAMENTO ESTRATÉGICO (SIGA ESTA ORDEM ESTRITAMENTE):
-        1. ANÁLISE: Leia o PDF apenas como histórico do caso. Mapeie a cronologia e encontre as vulnerabilidades da contraparte.
-        2. ARMAMENTO JURÍDICO: Levante a base legal, a jurisprudência e a doutrina aplicáveis especificamente para atacar as vulnerabilidades encontradas.
-        3. REDAÇÃO DA PEÇA: APENAS APÓS concluir a análise e o levantamento jurídico, redija a petição.
-        
-        REGRA CRÍTICA E INEGOCIÁVEL PARA A PEÇA PROCESSUAL: 
-        - É ESTRITAMENTE PROIBIDO copiar ou transcrever as petições antigas do PDF.
-        - Você DEVE redigir uma PEÇA NOVA e INÉDITA do ZERO.
-        - Utilize OBRIGATORIAMENTE na redação as armas que você acabou de criar (vulnerabilidades mapeadas, base legal, jurisprudência e doutrina).
-        - A peça deve ser COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO (Endereçamento, Qualificação, Fatos, Direito, Pedidos, Fecho formal).
+        REGRA DE OURO E INEGOCIÁVEL: O documento PDF enviado é APENAS MATERIAL DE CONSULTA (histórico do processo).
+        VOCÊ ESTÁ TERMINANTEMENTE PROIBIDO DE COPIAR, TRANSCREVER OU REAPROVEITAR QUALQUER PETIÇÃO, RECURSO OU MANIFESTAÇÃO QUE JÁ EXISTA DENTRO DO PDF.
+        Se você copiar o texto de uma apelação, defesa ou petição que já está no PDF, você falhará gravemente.
 
-        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA (preenchendo nesta ordem exata):
+        ARQUITETURA DE PENSAMENTO (SIGA ESTA ORDEM PARA PREENCHER O JSON):
+        1. Leia o PDF e extraia apenas os fatos crus.
+        2. Preencha 'resumo_estrategico', 'timeline' e 'vulnerabilidades_contraparte' mapeando o cenário e encontrando as falhas do processo.
+        3. Preencha 'base_legal', 'jurisprudencia' e 'doutrina' criando um arsenal inédito contra essas falhas.
+        4. No campo 'peca_processual', REDIJA UMA PEÇA 100% NOVA E INÉDITA, DO ZERO, atendendo ao comando passado em "FATOS NOVOS E DIRECIONAMENTO". 
+        - Você deve OBRIGATORIAMENTE usar as teses (jurisprudência e falhas) que você mesmo acabou de listar nos campos anteriores da sua análise.
+        - A peça deve ser COMPLETA, EXTENSA e PRONTA PARA PROTOCOLO (Endereçamento correto ao juízo, Qualificação, Dos Fatos, Do Direito, Dos Pedidos, Fecho formal).
+
+        RETORNE ESTRITAMENTE EM JSON COM ESTA ESTRUTURA:
         {{
-            "resumo_estrategico": "Sua análise técnica do cenário...", 
-            "jurimetria": "...", 
-            "resumo_cliente": "...",
-            "timeline": ["...", "..."], 
-            "vulnerabilidades_contraparte": ["Fraqueza 1", "Fraqueza 2"], 
+            "resumo_estrategico": "...", "jurimetria": "...", "resumo_cliente": "...",
+            "timeline": [{{"data": "...", "evento": "..."}}], 
+            "vulnerabilidades_contraparte": ["...", "..."], 
             "checklist": ["...", "..."],
-            "base_legal": ["Lei X...", "Artigo Y..."], 
-            "jurisprudencia": ["Decisão 1...", "Súmula Z..."], 
+            "base_legal": ["...", "..."], 
+            "jurisprudencia": ["...", "..."], 
             "doutrina": ["...", "..."], 
-            "peca_processual": "TEXTO INTEGRAL DA NOVA PEÇA AQUI, CONSTRUÍDA OBRIGATORIAMENTE COM AS TESES E JURISPRUDÊNCIAS DOS CAMPOS ANTERIORES..."
+            "peca_processual": "TEXTO INTEGRAL E EXTENSO DA NOVA PEÇA AQUI..."
         }}
         """
         
+        # O prompt vira o comando imediato do advogado
+        prompt_comando = f"FATOS NOVOS E DIRECIONAMENTO DO ADVOGADO:\n{fatos}\n\nINFORMAÇÕES DO JUÍZO:\nMagistrado: {mag}\nTribunal/Vara: {trib}\n\nCrie a estratégia e redija a NOVA peça baseada nestes direcionamentos e no histórico do PDF."
+
         prompt_partes = []
         prompt_partes.extend(conteudos_multimais)
-        prompt_partes.append(f"{instrucoes}\n\nFATOS (CRIAR PEÇA NOVA COM BASE NISTO):\n{fatos}")
+        prompt_partes.append(prompt_comando)
 
-        # --- A VACINA DOS FILTROS (Permite analisar crimes, litígios e afins sem a Google bloquear) ---
+        # --- A VACINA DOS FILTROS ---
         filtros_seguranca = [
             types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
             types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
@@ -144,15 +147,20 @@ def processar_background(task_id: str, fatos: str, area: str, mag: str, trib: st
             types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
         ]
 
+        # --- CONFIGURAÇÃO OTIMIZADA (TEMPERATURA E TOKENS) ---
         if len(conteudos_multimais) > 0:
             config_ia = types.GenerateContentConfig(
-                temperature=0.1,
+                system_instruction=instrucao_sistema,
+                temperature=0.35, # Temperatura ideal: fluidez sem alucinação
+                max_output_tokens=8192, # Evita o corte da petição (limite máximo do Flash)
                 response_mime_type="application/json",
                 safety_settings=filtros_seguranca
             )
         else:
             config_ia = types.GenerateContentConfig(
-                temperature=0.1, 
+                system_instruction=instrucao_sistema,
+                temperature=0.35,
+                max_output_tokens=8192,
                 response_mime_type="application/json",
                 tools=[{"googleSearch": {}}],
                 safety_settings=filtros_seguranca
@@ -269,4 +277,3 @@ def gerar_docx(dados: DadosPeca):
         return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": "attachment; filename=MA_Elite.docx"})
     except Exception as e:
         return JSONResponse(content={"erro": "Erro na geração do arquivo Word."}, status_code=500)
-
